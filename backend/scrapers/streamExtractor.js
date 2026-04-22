@@ -515,8 +515,8 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
 
   console.log(`  ✅  TMDB → ID:${mediaInfo.tmdbId} "${mediaInfo.title}" (${mediaInfo.year})`);
 
-  const PER_SOURCE_TIMEOUT   = 40_000; // 40s por fuente
-  const PER_SCRAPER_TIMEOUT  = 30_000; // 30s máximo por cada scraper (Cuevana, DoramasFlix, etc.)
+  const PER_SOURCE_TIMEOUT   = 25_000; // 25s por fuente (era 40s)
+  const PER_SCRAPER_TIMEOUT  = 20_000; // 20s máximo por cada scraper (era 30s)
   const MIN_SCRAPERS         = 2;      // retorno temprano si scrapers dan >= 2 streams
 
   // Helper: construir un resultado a partir de un rawUrl
@@ -641,14 +641,15 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     console.log(`  ⚠️  [Scrapers] No se encontraron embeds iniciales (Cuevana/DoramasFlux/AnimeFLV vacíos)`);
   }
 
-  // ── RETORNO TEMPRANO: scrapers devuelven suficientes streams ──────────────
-  if (scraperResults.length >= MIN_SCRAPERS) {
-    console.log(`\n  ✅  Retorno temprano con ${scraperResults.length} streams de scrapers.\n`);
-    return buildFinalResponse(scraperResults, mediaInfo, type, season, episode);
-  }
+  // ── RETORNO TEMPRANO DESHABILITADO: Siempre ejecutar backup para tener más opciones Latino ──
+  // Comentado para asegurar que AutoEmbed (Latino pri 1) siempre se ejecute
+  // if (scraperResults.length >= MIN_SCRAPERS) {
+  //   console.log(`\n  ✅  Retorno temprano con ${scraperResults.length} streams de scrapers.\n`);
+  //   return buildFinalResponse(scraperResults, mediaInfo, type, season, episode);
+  // }
 
-  // ── Paso 3: Backup (fuentes TMDB-based) ───────────────────────────────────
-  console.log(`  ↩️   Scrapers insuficientes (${scraperResults.length}/${MIN_SCRAPERS}). Ejecutando backup…`);
+  // ── Paso 3: Backup (fuentes TMDB-based) - SIEMPRE SE EJECUTA ──────────────
+  console.log(`  🔄  Ejecutando backup (AutoEmbed Latino + otros) - scrapers actuales: ${scraperResults.length}/${MIN_SCRAPERS}`);
   const sources = type === 'tv' ? TV_SOURCES : MOVIE_SOURCES;
   console.log(`  🔄  [Backup] Iniciando extracción de ${sources.length} fuentes TMDB-based...`);
 

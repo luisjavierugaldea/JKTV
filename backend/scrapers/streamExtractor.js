@@ -515,8 +515,8 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
 
   console.log(`  ✅  TMDB → ID:${mediaInfo.tmdbId} "${mediaInfo.title}" (${mediaInfo.year})`);
 
-  const PER_SOURCE_TIMEOUT   = 25_000; // 25s por fuente (era 40s)
-  const PER_SCRAPER_TIMEOUT  = 20_000; // 20s máximo por cada scraper (era 30s)
+  const PER_SOURCE_TIMEOUT   = 45_000; // 45s por fuente (AutoEmbed necesita tiempo)
+  const PER_SCRAPER_TIMEOUT  = 15_000; // 15s Cuevana (no vale la pena esperar más)
   const MIN_SCRAPERS         = 2;      // retorno temprano si scrapers dan >= 2 streams
 
   // Helper: construir un resultado a partir de un rawUrl
@@ -690,9 +690,9 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
   await Promise.race([
     Promise.all(backupSettled),
     new Promise((resolve) => setTimeout(() => { 
-      console.log('  ⏱️  [Backup] Timeout (60s) - continuando con resultados actuales'); 
+      console.log('  ⏱️  [Backup] Timeout (90s) - continuando con resultados actuales'); 
       resolve(); 
-    }, 60_000)),
+    }, 90_000)),
   ]);
   console.log(`  📊  [Backup] ${backupResults.length}/${sources.length} streams backup encontrados`);
 

@@ -14,6 +14,7 @@ import { createContext } from './browserPool.js';
 
 // Mirrors en orden de preferencia — el primero que responda con token gana
 const BASES = [
+  'https://cue.cuevana3.nu',  // Dominio actual (2025)
   'https://cuevana.gs',
   'https://cuevana3.me',
   'https://cuevana3.io',

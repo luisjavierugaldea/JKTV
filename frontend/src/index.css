@@ -299,6 +299,157 @@ body {
   scroll-snap-align: start;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE MOBILE - Media Queries
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  /* ── Header compacto ── */
+  header {
+    padding: 0 12px !important;
+  }
+  header > div {
+    height: 56px !important;
+    gap: 12px !important;
+  }
+  
+  /* Logo más pequeño */
+  header span[style*="font-size: 1.5rem"] {
+    font-size: 1.2rem !important;
+  }
+  header span[style*="font-size: 1.15rem"] {
+    font-size: 0.95rem !important;
+  }
+
+  /* ── SearchBar responsive ── */
+  .search-input {
+    padding: 10px 16px 10px 40px !important;
+    font-size: 0.9rem !important;
+  }
+  
+  /* Tabs más compactos */
+  .tab-btn {
+    padding: 6px 10px !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap;
+  }
+
+  /* ── Modal responsive ── */
+  .modal-backdrop {
+    padding: 0 !important;
+    align-items: flex-start !important;
+  }
+  
+  .modal-content {
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Contenido del modal más compacto */
+  .modal-content > div {
+    padding: 0 16px 24px !important;
+  }
+
+  /* Hero del modal más pequeño */
+  .modal-content img[style*="height: 220"] {
+    height: 160px !important;
+  }
+
+  /* Info de película en modal */
+  .modal-content h2 {
+    font-size: 1.3rem !important;
+    line-height: 1.3 !important;
+  }
+
+  .modal-content img[style*="width: 120"] {
+    width: 90px !important;
+  }
+
+  /* Botón cerrar más visible */
+  .modal-content button[aria-label="Cerrar"] {
+    width: 32px !important;
+    height: 32px !important;
+    top: 12px !important;
+    margin-right: 12px !important;
+  }
+
+  /* ── Botones más compactos ── */
+  .btn-primary,
+  .btn-ghost {
+    padding: 8px 16px !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* ── Sección title más pequeña ── */
+  .section-title {
+    font-size: 1.1rem !important;
+    margin-bottom: 16px !important;
+  }
+
+  /* ── MovieCard más pequeñas ── */
+  .movie-card {
+    border-radius: 8px !important;
+  }
+
+  /* ── Main padding reducido ── */
+  main {
+    padding: 24px 12px 60px !important;
+  }
+
+  /* ── Hero Banner ── */
+  .hero-banner {
+    height: auto !important;
+    min-height: 300px !important;
+  }
+
+  /* ── Video player ── */
+  .video-player-wrapper video {
+    max-height: 250px !important;
+  }
+
+  /* ── Spinner más pequeño ── */
+  .spinner {
+    width: 36px !important;
+    height: 36px !important;
+    border-width: 2.5px !important;
+  }
+
+  /* ── Ajustes generales de texto ── */
+  body {
+    font-size: 15px !important;
+  }
+
+  p {
+    font-size: 0.9rem !important;
+    line-height: 1.5 !important;
+  }
+}
+
+/* ── Extra pequeñas (< 480px) ── */
+@media (max-width: 480px) {
+  .tab-btn {
+    padding: 5px 8px !important;
+    font-size: 0.7rem !important;
+  }
+
+  .search-input {
+    padding: 8px 12px 8px 36px !important;
+    font-size: 0.85rem !important;
+  }
+
+  .modal-content h2 {
+    font-size: 1.15rem !important;
+  }
+
+  .btn-primary,
+  .btn-ghost {
+    padding: 7px 12px !important;
+    font-size: 0.8rem !important;
+  }
+}
+
 /* Tarjeta en fila horizontal — ancho fijo */
 .movie-row-track .movie-card {
   width: 140px;

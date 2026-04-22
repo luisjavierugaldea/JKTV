@@ -304,16 +304,24 @@ body {
    ══════════════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
-  /* ── Header compacto ── */
+  /* ── Header compacto y vertical ── */
   header {
-    padding: 0 12px !important;
+    padding: 8px 12px !important;
+    position: relative !important;
   }
   header > div {
-    height: 56px !important;
-    gap: 12px !important;
+    height: auto !important;
+    min-height: 48px !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    align-items: stretch !important;
   }
   
-  /* Logo más pequeño */
+  /* Logo más pequeño y centrado */
+  header > div > div:first-child {
+    justify-content: center !important;
+    margin-bottom: 4px;
+  }
   header span[style*="font-size: 1.5rem"] {
     font-size: 1.2rem !important;
   }
@@ -321,17 +329,44 @@ body {
     font-size: 0.95rem !important;
   }
 
-  /* ── SearchBar responsive ── */
+  /* ── SearchBar Layout Vertical ── */
+  .search-bar-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* ── Input de búsqueda MÁS VISIBLE ── */
   .search-input {
-    padding: 10px 16px 10px 40px !important;
-    font-size: 0.9rem !important;
+    padding: 12px 16px 12px 42px !important;
+    font-size: 0.95rem !important;
+    background: rgba(255,255,255,0.12) !important;
+    border: 1.5px solid rgba(255,255,255,0.15) !important;
+    color: #fff !important;
+    font-weight: 500 !important;
+  }
+  .search-input::placeholder {
+    color: rgba(255,255,255,0.5) !important;
+    font-weight: 400 !important;
+  }
+  .search-input:focus {
+    background: rgba(255,255,255,0.18) !important;
+    border-color: #e50914 !important;
+    box-shadow: 0 0 0 2px rgba(229,9,20,0.3) !important;
+  }
+  
+  /* Ícono de búsqueda más visible */
+  .search-icon {
+    color: rgba(255,255,255,0.7) !important;
+    font-size: 1.2rem !important;
+    left: 12px !important;
   }
   
   /* Tabs más compactos */
   .tab-btn {
-    padding: 6px 10px !important;
+    padding: 7px 10px !important;
     font-size: 0.75rem !important;
     white-space: nowrap;
+    border-radius: 6px !important;
   }
 
   /* ── Modal responsive ── */

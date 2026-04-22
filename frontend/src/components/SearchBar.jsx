@@ -17,9 +17,9 @@ export default function SearchBar({ onSearch, type, onTypeChange }) {
   }, [value]);
 
   return (
-    <div style={{ display: 'flex', gap: 10, maxWidth: 640, width: '100%', margin: '0 auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 640, width: '100%' }} className="search-bar-wrapper">
       {/* Selector de tipo */}
-      <div style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
         <button
           className={`tab-btn ${type === 'movie' ? 'active' : ''}`}
           onClick={() => onTypeChange('movie')}
@@ -39,10 +39,10 @@ export default function SearchBar({ onSearch, type, onTypeChange }) {
       </div>
 
       {/* Input */}
-      <div style={{ position: 'relative', flex: 1 }}>
-        <span style={{
+      <div style={{ position: 'relative', width: '100%' }}>
+        <span className="search-icon" style={{
           position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
-          color: 'var(--text-muted)', fontSize: '1.1rem', pointerEvents: 'none',
+          color: 'var(--text-muted)', fontSize: '1.1rem', pointerEvents: 'none', zIndex: 1,
         }}>🔍</span>
         <input
           id="search-input"
@@ -66,7 +66,7 @@ export default function SearchBar({ onSearch, type, onTypeChange }) {
             style={{
               position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
               background: 'none', border: 'none', color: 'var(--text-muted)',
-              cursor: 'pointer', fontSize: '1rem', padding: 4,
+              cursor: 'pointer', fontSize: '1rem', padding: 4, zIndex: 1,
             }}
           >✕</button>
         )}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Canal Streaming</string>
+    <string name="title_activity_main">Canal Streaming</string>
+    <string name="package_name">com.canal.streaming</string>
+    <string name="custom_url_scheme">com.canal.streaming</string>
+</resources>

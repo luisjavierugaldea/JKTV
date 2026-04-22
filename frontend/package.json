@@ -1,0 +1,38 @@
+{
+  "name": "canal-streaming",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3000",
+    "build": "vite build",
+    "preview": "vite preview",
+    "cap:init": "cap init",
+    "cap:add:android": "cap add android",
+    "cap:sync": "npm run build && cap sync",
+    "cap:open:android": "cap open android",
+    "android:dev": "npm run cap:sync && cap run android",
+    "android:build": "npm run build && cap sync android && cap open android",
+    "pwa:build": "npm run build"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "nodemon": "^3.1.14",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.9"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "axios": "^1.15.1",
+    "hls.js": "^1.6.16",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-router-dom": "^7.14.1",
+    "tailwindcss": "^4.2.2"
+  }
+}

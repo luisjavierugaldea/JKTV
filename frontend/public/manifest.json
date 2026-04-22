@@ -1,0 +1,57 @@
+{
+  "name": "JKTV",
+  "short_name": "JKTV",
+  "description": "Streaming de películas, series, anime y K-dramas",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#e50914",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["entertainment", "video"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Películas",
+      "short_name": "Movies",
+      "description": "Explorar películas",
+      "url": "/?type=movie",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Series",
+      "short_name": "TV",
+      "description": "Explorar series",
+      "url": "/?type=tv",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Anime",
+      "short_name": "Anime",
+      "description": "Explorar anime",
+      "url": "/?type=anime",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "K-Drama",
+      "short_name": "K-Drama",
+      "description": "Explorar K-dramas",
+      "url": "/?type=kdrama",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

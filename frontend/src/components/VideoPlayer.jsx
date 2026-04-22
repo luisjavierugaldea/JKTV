@@ -507,9 +507,10 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
         playsInline
         style={{
           width: '100%',
+          height: '100%',
           display: 'block',
           background: '#000',
-          ...(isFullscreen ? { maxHeight: '100vh', height: '100%' } : { maxHeight: 540 }),
+          objectFit: 'contain',
         }}
         title={title}
       />

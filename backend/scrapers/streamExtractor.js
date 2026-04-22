@@ -17,6 +17,7 @@ import {
   BLOCKED_PATTERNS,
 } from './sources.js';
 // import { getCuevanaEmbedUrls } from './cuevana.js'; // ⚠️ DESACTIVADO - Playwright crashea por detección de bots
+import { getPelisPlusMovieEmbeds, getPelisPlusSeriesEmbeds } from './pelisplus.js';
 import { getDoramasFlixEmbedUrls } from './doramasflix.js';
 import { getAnimeFLVEmbedUrls } from './animeflv.js';
 import { getJKAnimeEmbedUrls } from './jkanime.js';
@@ -539,11 +540,17 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     ]);
   }
 
-  // ── Paso 2: DoramasFlux + AnimeFLV + JKAnime en paralelo (Cuevana DESACTIVADO) ────────
-  const [cuevanaEmbeds, doramasEmbeds, animeEmbeds, jkanimeEmbeds] = await Promise.all([
-    // ⚠️ CUEVANA DESACTIVADO: Playwright crashea con "Target page has been closed"
-    // Los sitios lo detectan como bot y lo bloquean, causando crashes del backend
-    Promise.resolve([]), // cuevanaEmbeds vacío
+  // ── Paso 2: PelisPlus (Latino HTTP) + DoramasFlux + AnimeFLV + JKAnime en paralelo ────────
+  const [pelisplusEmbeds, doramasEmbeds, animeEmbeds, jkanimeEmbeds] = await Promise.all([
+    // PelisPlus: scraper HTTP puro para Latino (sin Playwright)
+    withTimeout(
+      (type === 'movie'
+        ? getPelisPlusMovieEmbeds({ title: mediaInfo.title, year: mediaInfo.year })
+        : getPelisPlusSeriesEmbeds({ title: mediaInfo.title, season, episode })
+      ),
+      PER_SCRAPER_TIMEOUT,
+      'PelisPlus'
+    ),
     withTimeout(
       getDoramasFlixEmbedUrls({
         title:         mediaInfo.title,
@@ -605,7 +612,7 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     };
   }
 
-  const allScraperEmbeds = [...cuevanaEmbeds, ...doramasEmbeds, ...animeEmbeds, ...jkanimeEmbeds];
+  const allScraperEmbeds = [...pelisplusEmbeds, ...doramasEmbeds, ...animeEmbeds, ...jkanimeEmbeds];
   const scraperResults   = [];
 
   if (allScraperEmbeds.length > 0) {
@@ -626,10 +633,10 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     ]);
     console.log(
       `  📺  [Scrapers] ${scraperResults.length}/${allScraperEmbeds.length} streams` +
-      ` (DoramasFlux:${doramasEmbeds.length} AnimeFLV:${animeEmbeds.length} JKAnime:${jkanimeEmbeds.length})`
+      ` (PelisPlus:${pelisplusEmbeds.length} DoramasFlux:${doramasEmbeds.length} AnimeFLV:${animeEmbeds.length})`
     );
   } else {
-    console.log(`  ⚠️  [Scrapers] No se encontraron embeds iniciales (DoramasFlux/AnimeFLV/JKAnime vacíos)`);
+    console.log(`  ⚠️  [Scrapers] No se encontraron embeds iniciales (PelisPlus/DoramasFlux/AnimeFLV vacíos)`);
   }
 
   // ── RETORNO TEMPRANO DESHABILITADO: Siempre ejecutar backup para tener más opciones Latino ──

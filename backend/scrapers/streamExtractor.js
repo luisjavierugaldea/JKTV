@@ -16,7 +16,7 @@ import {
   STREAM_PATTERNS,
   BLOCKED_PATTERNS,
 } from './sources.js';
-// import { getCuevanaEmbedUrls } from './cuevana.js'; // ⚠️ DESACTIVADO - Playwright crashea por detección de bots
+import { getCuevanaEmbedUrls } from './cuevana.js'; // ✅ REACTIVADO con delays anti-bot
 import { getPelisPlusMovieEmbeds, getPelisPlusSeriesEmbeds } from './pelisplus.js';
 import { getDoramasFlixEmbedUrls } from './doramasflix.js';
 import { getAnimeFLVEmbedUrls } from './animeflv.js';
@@ -517,7 +517,7 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
   console.log(`  ✅  TMDB → ID:${mediaInfo.tmdbId} "${mediaInfo.title}" (${mediaInfo.year})`);
 
   const PER_SOURCE_TIMEOUT   = 30_000; // 30s por fuente (balance velocidad/éxito)
-  const PER_SCRAPER_TIMEOUT  = 20_000; // 20s Cuevana (más tiempo porque funciona)
+  const PER_SCRAPER_TIMEOUT  = 60_000; // 60s para Cuevana (con delays anti-bot 2-5s entre intentos)
   const MIN_SCRAPERS         = 1;      // retorno temprano si scrapers dan >= 1 stream (mostrar rápido)
 
   // Helper: construir un resultado a partir de un rawUrl
@@ -540,15 +540,28 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     ]);
   }
 
-  // ── Paso 2: PelisPlus (Latino HTTP) + DoramasFlux + AnimeFLV + JKAnime en paralelo ────────
-  const [pelisplusEmbeds, doramasEmbeds, animeEmbeds, jkanimeEmbeds] = await Promise.all([
-    // PelisPlus: scraper HTTP puro para Latino (sin Playwright)
+  // ── Paso 2: Cuevana (Latino con delays) + PelisPlus + DoramasFlux + AnimeFLV en paralelo ────────
+  const [cuevanaEmbeds, pelisplusEmbeds, doramasEmbeds, animeEmbeds, jkanimeEmbeds] = await Promise.all([
+    // Cuevana: Latino con Playwright + delays aleatorios anti-bot (2-5s entre intentos)
+    withTimeout(
+      getCuevanaEmbedUrls({
+        title:         mediaInfo.title,
+        originalTitle: mediaInfo.originalTitle,
+        year:          mediaInfo.year,
+        type,
+        season,
+        episode,
+      }),
+      PER_SCRAPER_TIMEOUT,
+      'Cuevana'
+    ),
+    // PelisPlus: Latino HTTP puro (backup rápido)
     withTimeout(
       (type === 'movie'
         ? getPelisPlusMovieEmbeds({ title: mediaInfo.title, year: mediaInfo.year })
         : getPelisPlusSeriesEmbeds({ title: mediaInfo.title, season, episode })
       ),
-      PER_SCRAPER_TIMEOUT,
+      20_000, // PelisPlus más rápido (HTTP puro)
       'PelisPlus'
     ),
     withTimeout(
@@ -557,7 +570,7 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
         originalTitle: mediaInfo.originalTitle,
         type,
       }),
-      PER_SCRAPER_TIMEOUT,
+      20_000, // HTTP puro, más rápido que Cuevana
       'DoramasFlix'
     ),
     withTimeout(
@@ -568,7 +581,7 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
         season,
         episode,
       }),
-      PER_SCRAPER_TIMEOUT,
+      20_000,
       'AnimeFLV'
     ),
     withTimeout(
@@ -579,7 +592,7 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
         season,
         episode,
       }),
-      PER_SCRAPER_TIMEOUT,
+      20_000,
       'JKAnime'
     ),
   ]);
@@ -612,7 +625,7 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     };
   }
 
-  const allScraperEmbeds = [...pelisplusEmbeds, ...doramasEmbeds, ...animeEmbeds, ...jkanimeEmbeds];
+  const allScraperEmbeds = [...cuevanaEmbeds, ...pelisplusEmbeds, ...doramasEmbeds, ...animeEmbeds, ...jkanimeEmbeds];
   const scraperResults   = [];
 
   if (allScraperEmbeds.length > 0) {
@@ -633,10 +646,10 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     ]);
     console.log(
       `  📺  [Scrapers] ${scraperResults.length}/${allScraperEmbeds.length} streams` +
-      ` (PelisPlus:${pelisplusEmbeds.length} DoramasFlux:${doramasEmbeds.length} AnimeFLV:${animeEmbeds.length})`
+      ` (Cuevana:${cuevanaEmbeds.length} PelisPlus:${pelisplusEmbeds.length} Doramas:${doramasEmbeds.length})`
     );
   } else {
-    console.log(`  ⚠️  [Scrapers] No se encontraron embeds iniciales (PelisPlus/DoramasFlux/AnimeFLV vacíos)`);
+    console.log(`  ⚠️  [Scrapers] No se encontraron embeds iniciales (Cuevana/PelisPlus/Doramas vacíos)`);
   }
 
   // ── RETORNO TEMPRANO DESHABILITADO: Siempre ejecutar backup para tener más opciones Latino ──

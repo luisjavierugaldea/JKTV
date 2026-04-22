@@ -12,12 +12,15 @@
 
 import { createContext } from './browserPool.js';
 
-// Mirrors en orden de preferencia — el primero que responda con token gana
+// ⏱️ Delay aleatorio para parecer más humano (anti-bot)
+const randomDelay = () => new Promise(resolve => 
+  setTimeout(resolve, 2000 + Math.random() * 3000) // 2-5 segundos
+);
+
+// Mirrors reducidos (solo 2 más confiables para evitar detección)
 const BASES = [
-  'https://cue.cuevana3.nu',  // Dominio actual (2025)
-  'https://cuevana.gs',
-  'https://cuevana3.me',
-  'https://cuevana3.io',
+  'https://cue.cuevana3.nu',  // Dominio principal
+  'https://cuevana.gs',        // Backup
 ];
 
 // Servidores en orden de preferencia (más rápidos / sin captchas primero)
@@ -52,7 +55,7 @@ export function slugify(title, year) {
  * @param {string} pageUrl    - URL de la página en Cuevana
  * @param {number} timeoutMs  - Tiempo máximo de espera (default 25s)
  */
-async function extractToken(pageUrl, timeoutMs = 25_000) {
+async function extractToken(pageUrl, timeoutMs = 35_000) {
   let context = null;
   try {
     context = await createContext();
@@ -91,9 +94,11 @@ async function extractToken(pageUrl, timeoutMs = 25_000) {
       } catch { /* ignorar */ }
     });
 
-    // Navegar — waitUntil:'load' espera que el JS inicial se ejecute
+    // Navegar — waitUntil:'domcontentloaded' más rápido que 'load'
     try {
-      await page.goto(pageUrl, { waitUntil: 'load', timeout: Math.min(timeoutMs, 15_000) });
+      await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: Math.min(timeoutMs, 20_000) });
+      // Delay aleatorio para simular lectura humana
+      await page.waitForTimeout(1500 + Math.random() * 2000); // 1.5-3.5s
     } catch {
       // Continuar aunque haya timeout de navegación (SPA puede seguir cargando)
     }
@@ -175,9 +180,8 @@ export async function getCuevanaEmbedUrls({
   let token   = null;
   let foundBase = BASES[0];
 
-  // Limitar intentos para no exceder timeout
-  // Estrategia: probar primer slug en todos los bases, luego siguiente slug
-  // Máximo: 2 slugs × 3 bases = 6 intentos (2-10s cada uno = 12-60s max)
+  // Estrategia calmada: probar 2 bases × 2 slugs = 4 intentos MAX
+  // Con delays aleatorios entre intentos para evitar detección de bots
   const maxSlugs = 2; // Solo probar los 2 slugs más probables
   
   outer:
@@ -186,14 +190,20 @@ export async function getCuevanaEmbedUrls({
       const pageUrl  = `${BASES[b]}/${path}/${candidates[s]}`;
       console.log(`  🌮  [Cuevana] (${b + 1}/${BASES.length}) → ${pageUrl}`);
       
-      // Timeouts agresivos: primer intento 15s, resto 8s
-      const timeoutMs = (s === 0 && b === 0) ? 15_000 : 8_000;
+      // Timeout generoso: 35s primer intento, 25s resto
+      const timeoutMs = (s === 0 && b === 0) ? 35_000 : 25_000;
       const t = await extractToken(pageUrl, timeoutMs);
       
       if (t) { 
         token = t; 
         foundBase = BASES[b]; 
         break outer; 
+      }
+      
+      // ⏱️ Delay aleatorio entre intentos (solo si no es el último)
+      if (b < BASES.length - 1 || s < maxSlugs - 1) {
+        console.log('  💤  [Cuevana] Esperando 2-5s antes del siguiente intento...');
+        await randomDelay();
       }
     }
   }

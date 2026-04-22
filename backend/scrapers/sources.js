@@ -76,6 +76,46 @@ export const TV_SOURCES = [
     buildUrl: ({ tmdbId, season = 1, episode = 1 }) =>
       `https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}?lang=es`,
   },
+  {
+    id: 'multiembed_tv',
+    name: 'MultiEmbed',
+    language: 'Latino',
+    qualityHint: '1080p',
+    priority: 2,
+    isInteractive: false,
+    buildUrl: ({ tmdbId, season = 1, episode = 1 }) =>
+      `https://multiembed.mov/directstream.php?video_id=${tmdbId}&tmdb=1&s=${season}&e=${episode}`,
+  },
+  {
+    id: '2embed_tv',
+    name: '2Embed',
+    language: 'Latino',
+    qualityHint: '1080p',
+    priority: 2,
+    isInteractive: false,
+    buildUrl: ({ tmdbId, season = 1, episode = 1 }) =>
+      `https://www.2embed.cc/embedtv/${tmdbId}&s=${season}&e=${episode}`,
+  },
+  {
+    id: 'warezcdn_tv',
+    name: 'WarezCDN',
+    language: 'Latino',
+    qualityHint: '1080p',
+    priority: 2,
+    isInteractive: false,
+    buildUrl: ({ tmdbId, season = 1, episode = 1 }) =>
+      `https://embed.warezcdn.com/serie/${tmdbId}/${season}/${episode}`,
+  },
+  {
+    id: 'embedflix_tv',
+    name: 'EmbedFlix',
+    language: 'Latino',
+    qualityHint: '1080p',
+    priority: 2,
+    isInteractive: false,
+    buildUrl: ({ tmdbId, season = 1, episode = 1 }) =>
+      `https://embedflix.vercel.app/tv/${tmdbId}/${season}/${episode}`,
+  },
   // ── Subtitulado ────────────────────────────────────────────────────────────
   {
     id: 'embedsu_tv',

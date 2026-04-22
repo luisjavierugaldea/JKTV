@@ -18,6 +18,7 @@ import {
 } from './sources.js';
 import { getCuevanaEmbedUrls } from './cuevana.js'; // ✅ REACTIVADO con delays anti-bot
 import { getPelisPlusMovieEmbeds, getPelisPlusSeriesEmbeds } from './pelisplus.js';
+import { getStremioAddonStreams, getImdbIdFromTmdb } from './stremioAddons.js';
 import { getDoramasFlixEmbedUrls } from './doramasflix.js';
 import { getAnimeFLVEmbedUrls } from './animeflv.js';
 import { getJKAnimeEmbedUrls } from './jkanime.js';
@@ -645,6 +646,51 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     console.log(`  ⚠️  [Scrapers] No se encontraron embeds iniciales (Cuevana/PelisPlus/Anime vacíos)`);
   }
 
+  // ── Paso 2.5: Stremio Addons (requiere IMDB ID) ──────────────────────
+  console.log(`  🎬  [Stremio] Consultando addons...`);
+  
+  // Obtener IMDB ID desde TMDB (Stremio usa IMDB)
+  const imdbId = await getImdbIdFromTmdb(
+    mediaInfo.tmdbId,
+    type === 'tv' ? 'series' : 'movie',
+    config.tmdb.apiKey
+  );
+  
+  let stremioStreams = [];
+  if (imdbId) {
+    // Consultar addons de Stremio (Torrentio, Comet, etc)
+    const stremioEmbeds = await getStremioAddonStreams({
+      type: type === 'tv' ? 'series' : 'movie',
+      imdbId,
+      season,
+      episode,
+    });
+    
+    // Procesar streams de Stremio (ya vienen en formato casi listo)
+    for (const embed of stremioEmbeds) {
+      try {
+        // Los streams de Stremio ya vienen con URL directa (HTTP/HLS)
+        const result = {
+          server: embed.name,
+          language: embed.language,
+          quality: embed.qualityHint,
+          url: embed.embedUrl, // URL directa, no necesita proxy
+          directUrl: embed.embedUrl,
+          type: embed.streamType === 'hls' ? 'hls' : 'http',
+          sourceId: embed.id,
+        };
+        stremioStreams.push(result);
+        console.log(`  🎉  [Stremio/${embed.name}] OK → ${result.quality} ${result.language}`);
+      } catch (err) {
+        console.log(`  ⚠️  [Stremio/${embed.name}] Error: ${err.message}`);
+      }
+    }
+  } else {
+    console.log(`  ⚠️  [Stremio] Sin IMDB ID, no se pueden consultar addons`);
+  }
+  
+  console.log(`  📊  [Stremio] ${stremioStreams.length} streams de addons encontrados`);
+
   // ── RETORNO TEMPRANO DESHABILITADO: Siempre ejecutar backup para tener más opciones Latino ──
   // Comentado para asegurar que AutoEmbed (Latino pri 1) siempre se ejecute
   // if (scraperResults.length >= MIN_SCRAPERS) {
@@ -653,7 +699,7 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
   // }
 
   // ── Paso 3: Backup (fuentes TMDB-based) - SIEMPRE SE EJECUTA ──────────────
-  console.log(`  🔄  Ejecutando backup (AutoEmbed Latino + otros) - scrapers actuales: ${scraperResults.length}/${MIN_SCRAPERS}`);
+  console.log(`  🔄  Ejecutando backup (TMDB) - streams actuales: ${scraperResults.length + stremioStreams.length}/${MIN_SCRAPERS}`);
   const sources = type === 'tv' ? TV_SOURCES : MOVIE_SOURCES;
   console.log(`  🔄  [Backup] Iniciando extracción de ${sources.length} fuentes TMDB-based...`);
 
@@ -700,8 +746,8 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
   ]);
   console.log(`  📊  [Backup] ${backupResults.length}/${sources.length} streams backup encontrados`);
 
-  const results = [...scraperResults, ...backupResults];
-  console.log(`\n  📊  Streams encontrados: ${results.length}\n`);
+  const results = [...scraperResults, ...stremioStreams, ...backupResults];
+  console.log(`\n  📊  Streams encontrados: ${results.length} (Scrapers:${scraperResults.length} Stremio:${stremioStreams.length} Backup:${backupResults.length})\n`);
 
   if (results.length === 0) {
     // Mensaje más amigable para el usuario final

@@ -515,9 +515,9 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
 
   console.log(`  ✅  TMDB → ID:${mediaInfo.tmdbId} "${mediaInfo.title}" (${mediaInfo.year})`);
 
-  const PER_SOURCE_TIMEOUT   = 45_000; // 45s por fuente (AutoEmbed necesita tiempo)
-  const PER_SCRAPER_TIMEOUT  = 15_000; // 15s Cuevana (no vale la pena esperar más)
-  const MIN_SCRAPERS         = 2;      // retorno temprano si scrapers dan >= 2 streams
+  const PER_SOURCE_TIMEOUT   = 30_000; // 30s por fuente (balance velocidad/éxito)
+  const PER_SCRAPER_TIMEOUT  = 20_000; // 20s Cuevana (más tiempo porque funciona)
+  const MIN_SCRAPERS         = 1;      // retorno temprano si scrapers dan >= 1 stream (mostrar rápido)
 
   // Helper: construir un resultado a partir de un rawUrl
   function buildResult({ rawUrl, refEmbedUrl, meta }) {

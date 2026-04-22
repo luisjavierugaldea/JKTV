@@ -69,10 +69,10 @@ function findSpanishTrack(tracks) {
 // ── Configuración HLS ─────────────────────────────────────────────────────────
 const HLS_CONFIG = {
   // ── Buffer ────────────────────────────────────────────────────────────────
-  // 90s buffereados = seeking dentro de 1.5 min es instantáneo sin nueva petición al CDN
-  maxBufferLength:       90,
-  maxMaxBufferLength:    120,
-  maxBufferSize:         400 * 1024 * 1024, // 400 MB — ~400s de 1080p a 8 Mbps
+  // 120s buffereados = más cache, menos buffering en servidores lentos Latino
+  maxBufferLength:       120,
+  maxMaxBufferLength:    180,
+  maxBufferSize:         500 * 1024 * 1024, // 500 MB (aumentado para más cache)
   maxBufferHole:         0.5,
   backBufferLength:       30,
   startFragPrefetch:     true,

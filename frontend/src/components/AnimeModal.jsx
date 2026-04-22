@@ -49,10 +49,7 @@ export default function AnimeModal({ anime, onClose }) {
       const { data } = await animeApi.getInfo(anime.url);
       if (data.success && data.data) {
         setAnimeInfo(data.data);
-        // Auto-seleccionar primer episodio si hay disponibles
-        if (data.data.episodes?.length > 0) {
-          handleEpisodeSelect(data.data.episodes[0]);
-        }
+        // NO auto-seleccionar episodio - dejar que usuario elija
       } else {
         setError('No se pudo cargar la información del anime');
       }
@@ -130,11 +127,7 @@ export default function AnimeModal({ anime, onClose }) {
 
         if (allServers.length > 0) {
           setStreams(allServers);
-          // Auto-seleccionar primer servidor SUB si existe
-          const firstSub = allServers.find(s => s.language === 'SUB');
-          if (firstSub) {
-            setSelectedStream(firstSub);
-          }
+          // NO auto-seleccionar servidor - dejar que usuario elija
         } else {
           setError('No se encontraron servidores disponibles para este episodio');
         }

@@ -4,7 +4,7 @@
  */
 
 // 🎯 CAMBIAR AQUÍ: 'dev' o 'prod'
-const MODE = 'prod'; // 👈 Cambiar a 'prod' para usar Render
+const MODE = 'dev'; // 👈 Cambiar a 'prod' para usar Render
 
 const config = {
   dev: {

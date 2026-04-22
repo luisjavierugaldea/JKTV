@@ -4,13 +4,15 @@
  *
  * Flujo:
  *  1. Detalle: Sinopsis y info.
- *  2. Búsqueda: Muestra spinner mientras el backend corre el scraper multi-servidor.
- *  3. Selección: Muestra ServerSelector con opciones agrupadas por idioma.
- *  4. Reproducción: Monta el VideoPlayer con el stream elegido.
+ *  2. Para Series (TV): Selector de temporada/episodio primero
+ *  3. Búsqueda: Muestra spinner mientras el backend corre el scraper multi-servidor.
+ *  4. Selección: Muestra ServerSelector con opciones agrupadas por idioma.
+ *  5. Reproducción: Monta el VideoPlayer con el stream elegido.
  */
 import { useState, useEffect } from 'react';
 import VideoPlayer from './VideoPlayer';
 import ServerSelector from './ServerSelector';
+import TVEpisodeSelector from './TVEpisodeSelector';
 import { stream as streamApi } from '../lib/api';
 
 export default function MovieModal({ movie, type = 'movie', onClose }) {
@@ -18,6 +20,9 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
   const [selectedStream, setSelectedStream] = useState(null);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState(null);
+  const [season, setSeason]             = useState(1);
+  const [episode, setEpisode]           = useState(1);
+  const [hasSearched, setHasSearched]   = useState(false);
 
   // Defensivo: TMDB usa 'title' para películas y 'name' para series
   const title = movie.title ?? movie.name ?? movie.original_title ?? movie.original_name ?? '';
@@ -39,25 +44,53 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
     return () => { document.body.style.overflow = ''; };
   }, []);
 
-  // Auto-buscar al abrir el modal
+  // Auto-buscar al abrir el modal (SOLO para películas, NO para series)
   useEffect(() => {
-    if (title && title.trim().length >= 2) handleFindServers();
+    if (title && title.trim().length >= 2 && type === 'movie') {
+      handleFindServers();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleFindServers({ forceRefresh = false } = {}) {
+  async function handleFindServers({ forceRefresh = false, customSeason, customEpisode } = {}) {
     if (!title || title.trim().length < 2) {
       setError('No se pudo identificar el título de este contenido.');
       return;
     }
-    if (forceRefresh) streamApi.invalidate({ title: title.trim(), year, type });
+    
+    const finalSeason = customSeason ?? season;
+    const finalEpisode = customEpisode ?? episode;
+    
+    if (forceRefresh) {
+      streamApi.invalidate({ 
+        title: title.trim(), 
+        year, 
+        type, 
+        season: finalSeason, 
+        episode: finalEpisode 
+      });
+    }
+    
     setLoading(true);
     setError(null);
     setStreams([]);
     setSelectedStream(null);
+    setHasSearched(true);
 
     try {
-      const { data } = await streamApi.get({ title: title.trim(), year, type });
+      const params = { 
+        title: title.trim(), 
+        year, 
+        type 
+      };
+      
+      // Solo agregar season/episode si es serie
+      if (type === 'tv') {
+        params.season = finalSeason;
+        params.episode = finalEpisode;
+      }
+      
+      const { data } = await streamApi.get(params);
       if (data.success && data.streams?.length > 0) {
         setStreams(data.streams);
       } else {
@@ -71,6 +104,16 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
     } finally {
       setLoading(false);
     }
+  }
+  
+  function handleEpisodeSelect(episodeInfo) {
+    setSeason(episodeInfo.season);
+    setEpisode(episodeInfo.episode);
+    // Buscar servidores para el episodio seleccionado
+    handleFindServers({ 
+      customSeason: episodeInfo.season, 
+      customEpisode: episodeInfo.episode 
+    });
   }
 
   return (
@@ -144,6 +187,16 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
               color: 'rgba(255,255,255,0.7)', fontSize: '1rem',
               lineHeight: 1.7, marginBottom: 32, maxWidth: 750,
             }}>{overview}</p>
+          )}
+
+          {/* Selector de Episodios (SOLO para series TV) */}
+          {type === 'tv' && !loading && !hasSearched && !selectedStream && (
+            <TVEpisodeSelector 
+              tvShow={movie}
+              onEpisodeSelect={handleEpisodeSelect}
+              currentSeason={season}
+              currentEpisode={episode}
+            />
           )}
 
           {/* ── ESTADOS ── */}

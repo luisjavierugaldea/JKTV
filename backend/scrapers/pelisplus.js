@@ -8,16 +8,19 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
-const BASE_URL = 'https://pelisplus.lat';
+// PelisPlus dominios alternativos (pelisplus.lat está caído con DNS error)
+const BASE_URLS = [
+  'https://ww3.pelisplushd.nu',    // Dominio actual funcionando
+  'https://pelisplus.espm',         // Alternativo
+];
 const TIMEOUT = 15000;
 
-const axiosInstance = axios.create({
+  const axiosInstance = axios.create({
   timeout: TIMEOUT,
   headers: {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'es-MX,es;q=0.9,en;q=0.8',
-    'Referer': BASE_URL,
   },
 });
 
@@ -118,12 +121,14 @@ export async function getPelisPlusMovieEmbeds({ title, year }) {
   const slugs = generateSlugs(title, year);
   console.log(`  🔍  [PelisPlus] Slugs generados: ${slugs.join(', ')}`);
 
-  // Probar cada slug hasta encontrar uno que funcione
-  for (const slug of slugs) {
-    const url = `${BASE_URL}/pelicula/${slug}`;
-    const embeds = await extractEmbedsFromPage(url);
-    if (embeds.length > 0) {
-      return embeds;
+  // Probar cada dominio con cada slug hasta encontrar uno que funcione
+  for (const baseUrl of BASE_URLS) {
+    for (const slug of slugs) {
+      const url = `${baseUrl}/pelicula/${slug}`;
+      const embeds = await extractEmbedsFromPage(url);
+      if (embeds.length > 0) {
+        return embeds;
+      }
     }
   }
 
@@ -140,19 +145,21 @@ export async function getPelisPlusSeriesEmbeds({ title, season, episode }) {
   const slugs = generateSlugs(title);
   console.log(`  🔍  [PelisPlus] Slugs generados: ${slugs.join(', ')}`);
 
-  // Probar cada slug
-  for (const slug of slugs) {
-    // pelisplus usa formato: /serie/nombre/temporada-X/capitulo-Y
-    const urls = [
-      `${BASE_URL}/serie/${slug}/temporada-${season}/capitulo-${episode}`,
-      `${BASE_URL}/serie/${slug}/${season}/${episode}`,
-      `${BASE_URL}/serie/${slug}/temporada-${season}/episodio-${episode}`,
-    ];
+  // Probar cada dominio con cada slug y formato
+  for (const baseUrl of BASE_URLS) {
+    for (const slug of slugs) {
+      // pelisplus usa diferentes formatos: /serie/nombre/temporada-X/capitulo-Y
+      const urls = [
+        `${baseUrl}/serie/${slug}/temporada-${season}/capitulo-${episode}`,
+        `${baseUrl}/serie/${slug}/${season}/${episode}`,
+        `${baseUrl}/serie/${slug}/temporada-${season}/episodio-${episode}`,
+      ];
 
-    for (const url of urls) {
-      const embeds = await extractEmbedsFromPage(url);
-      if (embeds.length > 0) {
-        return embeds;
+      for (const url of urls) {
+        const embeds = await extractEmbedsFromPage(url);
+        if (embeds.length > 0) {
+          return embeds;
+        }
       }
     }
   }

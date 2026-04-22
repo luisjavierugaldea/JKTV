@@ -540,7 +540,7 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     ]);
   }
 
-  // ── Paso 2: Cuevana (Latino con delays) + PelisPlus + DoramasFlux + AnimeFLV en paralelo ────────
+  // ── Paso 2: Cuevana (Latino con delays) + PelisPlus + AnimeFLV en paralelo ────────
   const [cuevanaEmbeds, pelisplusEmbeds, doramasEmbeds, animeEmbeds, jkanimeEmbeds] = await Promise.all([
     // Cuevana: Latino con Playwright + delays aleatorios anti-bot (2-5s entre intentos)
     withTimeout(
@@ -564,15 +564,8 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
       20_000, // PelisPlus más rápido (HTTP puro)
       'PelisPlus'
     ),
-    withTimeout(
-      getDoramasFlixEmbedUrls({
-        title:         mediaInfo.title,
-        originalTitle: mediaInfo.originalTitle,
-        type,
-      }),
-      20_000, // HTTP puro, más rápido que Cuevana
-      'DoramasFlix'
-    ),
+    // DoramasFlux: DESACTIVADO - Playwright crashea igual que Cuevana
+    Promise.resolve([]), // doramasEmbeds vacío
     withTimeout(
       getAnimeFLVEmbedUrls({
         title:         mediaInfo.title,
@@ -646,10 +639,10 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     ]);
     console.log(
       `  📺  [Scrapers] ${scraperResults.length}/${allScraperEmbeds.length} streams` +
-      ` (Cuevana:${cuevanaEmbeds.length} PelisPlus:${pelisplusEmbeds.length} Doramas:${doramasEmbeds.length})`
+      ` (Cuevana:${cuevanaEmbeds.length} PelisPlus:${pelisplusEmbeds.length} Anime:${animeEmbeds.length})`
     );
   } else {
-    console.log(`  ⚠️  [Scrapers] No se encontraron embeds iniciales (Cuevana/PelisPlus/Doramas vacíos)`);
+    console.log(`  ⚠️  [Scrapers] No se encontraron embeds iniciales (Cuevana/PelisPlus/Anime vacíos)`);
   }
 
   // ── RETORNO TEMPRANO DESHABILITADO: Siempre ejecutar backup para tener más opciones Latino ──

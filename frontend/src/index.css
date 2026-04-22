@@ -300,6 +300,37 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE DESKTOP - Arreglar header cortado
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@media (min-width: 769px) {
+  /* ── SearchBar en desktop no se corta ── */
+  .search-bar-wrapper {
+    max-width: 600px !important;
+    width: 100% !important;
+  }
+  
+  .search-input {
+    width: 100% !important;
+    min-width: 300px !important;
+  }
+  
+  /* Header con espacio suficiente */
+  header > div {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 24px !important;
+    flex-wrap: wrap !important;
+  }
+  
+  /* Tabs horizontales en desktop */
+  .tab-btn {
+    padding: 8px 14px !important;
+    font-size: 0.85rem !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    RESPONSIVE MOBILE - Media Queries
    ══════════════════════════════════════════════════════════════════════════ */
 

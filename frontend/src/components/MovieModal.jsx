@@ -115,6 +115,24 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
       customEpisode: episodeInfo.episode 
     });
   }
+  
+  function handleNextEpisode() {
+    const newEpisode = episode + 1;
+    handleEpisodeSelect({ season, episode: newEpisode });
+  }
+  
+  function handlePrevEpisode() {
+    if (episode > 1) {
+      const newEpisode = episode - 1;
+      handleEpisodeSelect({ season, episode: newEpisode });
+    }
+  }
+  
+  function handleBackToEpisodes() {
+    setStreams([]);
+    setSelectedStream(null);
+    setHasSearched(false);
+  }
 
   return (
     <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -246,8 +264,8 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
           {selectedStream && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeIn 0.5s ease' }}>
               {/* Info mínima arriba del player */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <button
                     onClick={() => setSelectedStream(null)}
                     style={{
@@ -256,11 +274,30 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
                       cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6
                     }}
                   >← Volver a servidores</button>
+                  
+                  {type === 'tv' && (
+                    <button
+                      onClick={handleBackToEpisodes}
+                      style={{
+                        background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)',
+                        color: '#60a5fa', padding: '6px 14px', borderRadius: 8,
+                        cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6,
+                        fontWeight: 600
+                      }}
+                    >📺 Ver Episodios</button>
+                  )}
+                  
                   <div style={{ fontSize: '0.9rem' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Reproduciendo desde: </span>
                     <span style={{ fontWeight: 700 }}>{selectedStream.server}</span>
                     <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 8px' }}>|</span>
                     <span style={{ color: '#4ade80', fontWeight: 700 }}>{selectedStream.language}</span>
+                    {type === 'tv' && (
+                      <>
+                        <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 8px' }}>|</span>
+                        <span style={{ color: '#60a5fa', fontWeight: 700 }}>T{season} EP{episode}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -270,6 +307,88 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
                 streamType={selectedStream.type}
                 title={title}
               />
+
+              {/* Navegación de episodios (solo para series) */}
+              {type === 'tv' && (
+                <div style={{
+                  display: 'flex',
+                  gap: 12,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: '16px 0',
+                  borderTop: '1px solid rgba(255,255,255,0.08)',
+                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                }}>
+                  <button
+                    onClick={handlePrevEpisode}
+                    disabled={episode <= 1}
+                    style={{
+                      background: episode > 1 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: episode > 1 ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)',
+                      padding: '10px 20px',
+                      borderRadius: 8,
+                      cursor: episode > 1 ? 'pointer' : 'not-allowed',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (episode > 1) {
+                        e.target.style.background = 'rgba(255,255,255,0.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (episode > 1) {
+                        e.target.style.background = 'rgba(255,255,255,0.05)';
+                      }
+                    }}
+                  >
+                    ⬅️ Anterior
+                  </button>
+                  
+                  <div style={{
+                    padding: '8px 16px',
+                    background: 'rgba(96,165,250,0.1)',
+                    border: '1px solid rgba(96,165,250,0.2)',
+                    borderRadius: 8,
+                    color: '#60a5fa',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                  }}>
+                    Temporada {season} · Episodio {episode}
+                  </div>
+                  
+                  <button
+                    onClick={handleNextEpisode}
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: 'rgba(255,255,255,0.9)',
+                      padding: '10px 20px',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = 'rgba(255,255,255,0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = 'rgba(255,255,255,0.05)';
+                    }}
+                  >
+                    Siguiente ➡️
+                  </button>
+                </div>
+              )}
 
               {/* Sinopsis pequeña abajo del player */}
               <div style={{ padding: '0 4px' }}>

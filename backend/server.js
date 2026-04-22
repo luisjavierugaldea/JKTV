@@ -1,9 +1,10 @@
 /**
- * server.js — Punto de entrada del backend "Stremio Clone"
+ * server.js — Punto de entrada del backend "JKTV"
  *
  * Stack: Node.js + Express
  * Ejecutar en desarrollo: npm run dev
  * Ejecutar en producción: npm start
+ * Última actualización: 2026-04-22 - Rutas de anime + películas/series activas
  */
 
 import express from 'express';

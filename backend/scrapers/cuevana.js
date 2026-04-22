@@ -204,6 +204,9 @@ export async function getCuevanaEmbedUrls({
 
   console.log(`  ✅  [Cuevana] Token OK en ${foundBase} → ${LATINO_SERVERS.length} servidores.`);
 
+  // Para series, agregar parámetros de temporada y episodio
+  const episodeParams = type === 'tv' ? `&s=${season}&e=${episode}` : '';
+
   return LATINO_SERVERS.map((server, idx) => ({
     id:          `cuevana_${server}`,
     name:        `Cuevana ${server}`,
@@ -211,6 +214,6 @@ export async function getCuevanaEmbedUrls({
     qualityHint: 'Full HD',
     priority:    idx + 1,
     isInteractive: false,
-    embedUrl:    `${foundBase}/player.php?t=${token}&server=${server}`,
+    embedUrl:    `${foundBase}/player.php?t=${token}&server=${server}${episodeParams}`,
   }));
 }

@@ -16,7 +16,7 @@ import {
   STREAM_PATTERNS,
   BLOCKED_PATTERNS,
 } from './sources.js';
-import { getCuevanaEmbedUrls } from './cuevana.js';
+// import { getCuevanaEmbedUrls } from './cuevana.js'; // ⚠️ DESACTIVADO - Playwright crashea por detección de bots
 import { getDoramasFlixEmbedUrls } from './doramasflix.js';
 import { getAnimeFLVEmbedUrls } from './animeflv.js';
 import { getJKAnimeEmbedUrls } from './jkanime.js';
@@ -539,20 +539,11 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     ]);
   }
 
-  // ── Paso 2: Cuevana + DoramasFlux + AnimeFLV + JKAnime en paralelo ────────
+  // ── Paso 2: DoramasFlux + AnimeFLV + JKAnime en paralelo (Cuevana DESACTIVADO) ────────
   const [cuevanaEmbeds, doramasEmbeds, animeEmbeds, jkanimeEmbeds] = await Promise.all([
-    withTimeout(
-      getCuevanaEmbedUrls({
-        title:         mediaInfo.title,
-        originalTitle: mediaInfo.originalTitle,
-        year:          mediaInfo.year,
-        type,
-        season,
-        episode,
-      }),
-      PER_SCRAPER_TIMEOUT,
-      'Cuevana'
-    ),
+    // ⚠️ CUEVANA DESACTIVADO: Playwright crashea con "Target page has been closed"
+    // Los sitios lo detectan como bot y lo bloquean, causando crashes del backend
+    Promise.resolve([]), // cuevanaEmbeds vacío
     withTimeout(
       getDoramasFlixEmbedUrls({
         title:         mediaInfo.title,
@@ -635,10 +626,10 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     ]);
     console.log(
       `  📺  [Scrapers] ${scraperResults.length}/${allScraperEmbeds.length} streams` +
-      ` (Cuevana:${cuevanaEmbeds.length} DoramasFlux:${doramasEmbeds.length} AnimeFLV:${animeEmbeds.length})`
+      ` (DoramasFlux:${doramasEmbeds.length} AnimeFLV:${animeEmbeds.length} JKAnime:${jkanimeEmbeds.length})`
     );
   } else {
-    console.log(`  ⚠️  [Scrapers] No se encontraron embeds iniciales (Cuevana/DoramasFlux/AnimeFLV vacíos)`);
+    console.log(`  ⚠️  [Scrapers] No se encontraron embeds iniciales (DoramasFlux/AnimeFLV/JKAnime vacíos)`);
   }
 
   // ── RETORNO TEMPRANO DESHABILITADO: Siempre ejecutar backup para tener más opciones Latino ──

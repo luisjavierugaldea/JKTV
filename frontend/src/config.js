@@ -14,7 +14,7 @@ const config = {
   },
   prod: {
     // Backend en Render (nube) - Actualizar cuando tengas la URL
-    backendURL: 'https://TU-APP.onrender.com/api', // ⚠️ Cambiar cuando configures Render
+    backendURL: 'https://jktv-backend.onrender.com/api', // Point to API root on Render
     description: 'Producción - Backend en Render',
   },
 };

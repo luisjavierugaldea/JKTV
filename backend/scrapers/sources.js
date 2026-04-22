@@ -4,57 +4,9 @@
  */
 
 export const MOVIE_SOURCES = [
-  // ── Latino ─────────────────────────────────────────────────────────────────
-  {
-    id: 'autoembed_latino',
-    name: 'AutoEmbed',
-    language: 'Latino',
-    qualityHint: '1080p',
-    priority: 1,
-    isInteractive: false,
-    buildUrl: ({ tmdbId }) =>
-      `https://autoembed.co/movie/tmdb/${tmdbId}?lang=es`,
-  },
-  {
-    id: 'multiembed_movie',
-    name: 'MultiEmbed',
-    language: 'Latino',
-    qualityHint: '1080p',
-    priority: 2,
-    isInteractive: false,
-    buildUrl: ({ tmdbId }) =>
-      `https://multiembed.mov/directstream.php?video_id=${tmdbId}&tmdb=1`,
-  },
-  {
-    id: '2embed_movie',
-    name: '2Embed',
-    language: 'Latino',
-    qualityHint: '1080p',
-    priority: 2,
-    isInteractive: false,
-    buildUrl: ({ tmdbId }) =>
-      `https://www.2embed.cc/embed/${tmdbId}`,
-  },
-  {
-    id: 'warezcdn_movie',
-    name: 'WarezCDN',
-    language: 'Latino',
-    qualityHint: '1080p',
-    priority: 2,
-    isInteractive: false,
-    buildUrl: ({ tmdbId }) =>
-      `https://embed.warezcdn.com/filme/${tmdbId}`,
-  },
-  {
-    id: 'embedflix_movie',
-    name: 'EmbedFlix',
-    language: 'Latino',
-    qualityHint: '1080p',
-    priority: 2,
-    isInteractive: false,
-    buildUrl: ({ tmdbId }) =>
-      `https://embedflix.vercel.app/movie/${tmdbId}`,
-  },
+  // ── Latino (Cuevana vía scraper principal - voe/goodstream) ────────────────
+  // Los backup TMDB están desactivados porque Playwright los bloquea
+  
   // ── Subtitulado ────────────────────────────────────────────────────────────
   {
     id: 'embedsu',
@@ -105,57 +57,9 @@ export const MOVIE_SOURCES = [
 ];
 
 export const TV_SOURCES = [
-  // ── Latino ─────────────────────────────────────────────────────────────────
-  {
-    id: 'autoembed_tv_lat',
-    name: 'AutoEmbed',
-    language: 'Latino',
-    qualityHint: '1080p',
-    priority: 1,
-    isInteractive: false,
-    buildUrl: ({ tmdbId, season = 1, episode = 1 }) =>
-      `https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}?lang=es`,
-  },
-  {
-    id: 'multiembed_tv',
-    name: 'MultiEmbed',
-    language: 'Latino',
-    qualityHint: '1080p',
-    priority: 2,
-    isInteractive: false,
-    buildUrl: ({ tmdbId, season = 1, episode = 1 }) =>
-      `https://multiembed.mov/directstream.php?video_id=${tmdbId}&tmdb=1&s=${season}&e=${episode}`,
-  },
-  {
-    id: '2embed_tv',
-    name: '2Embed',
-    language: 'Latino',
-    qualityHint: '1080p',
-    priority: 2,
-    isInteractive: false,
-    buildUrl: ({ tmdbId, season = 1, episode = 1 }) =>
-      `https://www.2embed.cc/embedtv/${tmdbId}&s=${season}&e=${episode}`,
-  },
-  {
-    id: 'warezcdn_tv',
-    name: 'WarezCDN',
-    language: 'Latino',
-    qualityHint: '1080p',
-    priority: 2,
-    isInteractive: false,
-    buildUrl: ({ tmdbId, season = 1, episode = 1 }) =>
-      `https://embed.warezcdn.com/serie/${tmdbId}/${season}/${episode}`,
-  },
-  {
-    id: 'embedflix_tv',
-    name: 'EmbedFlix',
-    language: 'Latino',
-    qualityHint: '1080p',
-    priority: 2,
-    isInteractive: false,
-    buildUrl: ({ tmdbId, season = 1, episode = 1 }) =>
-      `https://embedflix.vercel.app/tv/${tmdbId}/${season}/${episode}`,
-  },
+  // ── Latino (Cuevana vía scraper principal - voe/goodstream) ────────────────
+  // Los backup TMDB desactivados porque Playwright los bloquea (timeout 30s)
+  
   // ── Subtitulado ────────────────────────────────────────────────────────────
   {
     id: 'embedsu_tv',

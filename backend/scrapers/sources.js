@@ -15,6 +15,46 @@ export const MOVIE_SOURCES = [
     buildUrl: ({ tmdbId }) =>
       `https://autoembed.co/movie/tmdb/${tmdbId}?lang=es`,
   },
+  {
+    id: 'multiembed_movie',
+    name: 'MultiEmbed',
+    language: 'Latino',
+    qualityHint: '1080p',
+    priority: 2,
+    isInteractive: false,
+    buildUrl: ({ tmdbId }) =>
+      `https://multiembed.mov/directstream.php?video_id=${tmdbId}&tmdb=1`,
+  },
+  {
+    id: '2embed_movie',
+    name: '2Embed',
+    language: 'Latino',
+    qualityHint: '1080p',
+    priority: 2,
+    isInteractive: false,
+    buildUrl: ({ tmdbId }) =>
+      `https://www.2embed.cc/embed/${tmdbId}`,
+  },
+  {
+    id: 'warezcdn_movie',
+    name: 'WarezCDN',
+    language: 'Latino',
+    qualityHint: '1080p',
+    priority: 2,
+    isInteractive: false,
+    buildUrl: ({ tmdbId }) =>
+      `https://embed.warezcdn.com/filme/${tmdbId}`,
+  },
+  {
+    id: 'embedflix_movie',
+    name: 'EmbedFlix',
+    language: 'Latino',
+    qualityHint: '1080p',
+    priority: 2,
+    isInteractive: false,
+    buildUrl: ({ tmdbId }) =>
+      `https://embedflix.vercel.app/movie/${tmdbId}`,
+  },
   // ── Subtitulado ────────────────────────────────────────────────────────────
   {
     id: 'embedsu',

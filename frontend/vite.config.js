@@ -7,6 +7,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  optimizeDeps: {
+    exclude: ['webtorrent'], // Excluir WebTorrent del pre-bundling (se carga dinámicamente)
+  },
   server: {
     port: 3000,
     strictPort: true, // Fallar si el puerto está ocupado en lugar de buscar otro

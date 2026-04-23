@@ -13,7 +13,7 @@
 
 import { createContext } from './browserPool.js';
 
-const BASE         = 'https://doramasflix.io';
+const BASE         = 'https://doramasflix.co';
 const PAGE_TIMEOUT = 20_000;
 const INPUT_WAIT   = 8_000;
 
@@ -143,6 +143,60 @@ export async function getDoramasFlixEmbedUrls({ title, originalTitle, type = 'mo
     }
   }
 
-  console.log(`  ℹ️  [DoramasFlux] Sin resultados para "${title}"`);
+  console.log(`  ℹ️  [DoramasFlix] Sin resultados para "${title}"`);
+  return [];
+}
+
+/**
+ * Busca y devuelve embed URLs de DoramasFlix para episodios de series/Kdramas.
+ * Formato esperado: /capitulos/{slug}-{season}x{episode}
+ */
+export async function getDoramasFlixEpisodeEmbeds({ title, originalTitle, season, episode }) {
+  const slugs = buildSlugCandidates(title, originalTitle);
+
+  for (const slug of slugs) {
+    const url = `${BASE}/capitulos/${slug}-${season}x${episode}`;
+    console.log(`  🐉  [DoramasFlix Kdrama] → ${url}`);
+
+    const servers = await fetchEmbeds(url);
+    if (servers.length > 0) {
+      return servers.map((s, i) => ({
+        id:          `doramasflix_${i + 1}`,
+        name:        `DoramasFlix (${s.name})`,
+        embedUrl:    s.url,
+        language:    'Subtitulado',
+        qualityHint: '1080p',
+      }));
+    }
+  }
+
+  console.log(`  ℹ️  [DoramasFlix Kdrama] Sin resultados para "${title}" S${season}E${episode}`);
+  return [];
+}
+
+/**
+ * Busca y devuelve embed URLs de DoramasFlix para películas asiáticas.
+ * Formato esperado: /peliculas/{slug}
+ */
+export async function getDoramasFlixMovieEmbeds({ title, originalTitle }) {
+  const slugs = buildSlugCandidates(title, originalTitle);
+
+  for (const slug of slugs) {
+    const url = `${BASE}/peliculas/${slug}`;
+    console.log(`  🐉  [DoramasFlix Película] → ${url}`);
+
+    const servers = await fetchEmbeds(url);
+    if (servers.length > 0) {
+      return servers.map((s, i) => ({
+        id:          `doramasflix_movie_${i + 1}`,
+        name:        `DoramasFlix (${s.name})`,
+        embedUrl:    s.url,
+        language:    'Subtitulado',
+        qualityHint: '1080p',
+      }));
+    }
+  }
+
+  console.log(`  ℹ️  [DoramasFlix Película] Sin resultados para "${title}"`);
   return [];
 }

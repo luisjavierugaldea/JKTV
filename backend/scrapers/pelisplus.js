@@ -8,10 +8,10 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
-// PelisPlus dominios alternativos (pelisplus.lat está caído con DNS error)
+// PelisPlus dominios alternativos
 const BASE_URLS = [
-  'https://ww3.pelisplushd.nu',    // Dominio actual funcionando
-  'https://pelisplus.espm',         // Alternativo
+  'https://www.pelisplushd.la',    // Dominio principal
+  'https://ww3.pelisplushd.nu',    // Dominio secundario
 ];
 const TIMEOUT = 15000;
 
@@ -148,11 +148,11 @@ export async function getPelisPlusSeriesEmbeds({ title, season, episode }) {
   // Probar cada dominio con cada slug y formato
   for (const baseUrl of BASE_URLS) {
     for (const slug of slugs) {
-      // pelisplus usa diferentes formatos: /serie/nombre/temporada-X/capitulo-Y
+      // pelisplus usa diferentes formatos
       const urls = [
+        `${baseUrl}/serie/${slug}/temporada/${season}/capitulo/${episode}`,
         `${baseUrl}/serie/${slug}/temporada-${season}/capitulo-${episode}`,
         `${baseUrl}/serie/${slug}/${season}/${episode}`,
-        `${baseUrl}/serie/${slug}/temporada-${season}/episodio-${episode}`,
       ];
 
       for (const url of urls) {
@@ -165,5 +165,35 @@ export async function getPelisPlusSeriesEmbeds({ title, season, episode }) {
   }
 
   console.log(`  ℹ️  [PelisPlus] Sin resultados para "${title}" S${season}E${episode}`);
+  return [];
+}
+
+/**
+ * Obtiene embeds de pelisplus para anime
+ */
+export async function getPelisPlusAnimeEmbeds({ title, season, episode }) {
+  console.log(`  🎌  [PelisPlus Anime] → Buscando: "${title}" S${season}E${episode}`);
+
+  const slugs = generateSlugs(title);
+  console.log(`  🔍  [PelisPlus Anime] Slugs generados: ${slugs.join(', ')}`);
+
+  // Probar cada dominio con cada slug y formato
+  for (const baseUrl of BASE_URLS) {
+    for (const slug of slugs) {
+      const urls = [
+        `${baseUrl}/anime/${slug}/temporada/${season}/capitulo/${episode}`,
+        `${baseUrl}/anime/${slug}/temporada-${season}/capitulo-${episode}`,
+      ];
+
+      for (const url of urls) {
+        const embeds = await extractEmbedsFromPage(url);
+        if (embeds.length > 0) {
+          return embeds;
+        }
+      }
+    }
+  }
+
+  console.log(`  ℹ️  [PelisPlus Anime] Sin resultados para "${title}" S${season}E${episode}`);
   return [];
 }

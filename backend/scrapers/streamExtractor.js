@@ -13,7 +13,8 @@ import {
   BLOCKED_PATTERNS,
 } from './sources.js';
 import { getCuevanaEmbedUrls } from './cuevana.js';
-import { getPelisPlusSeriesEmbeds } from './pelisplus.js'; // Eliminamos getPelisPlusMovieEmbeds
+import { getPelisPlusSeriesEmbeds, getPelisPlusAnimeEmbeds } from './pelisplus.js';
+import { getDoramasFlixEpisodeEmbeds, getDoramasFlixMovieEmbeds } from './doramasflix.js';
 import { getStremioAddonStreams, getImdbIdFromTmdb } from './stremioAddons.js';
 import { getAnimeFLVEmbedUrls } from './animeflv.js';
 import { getJKAnimeEmbedUrls } from './jkanime.js';
@@ -171,40 +172,56 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     ? await resolveTmdbTv(title)
     : await resolveTmdbMovie(title, year);
 
+  const originCountries = mediaInfo.originCountry || [];
+  const genreIds = mediaInfo.genreIds || [];
+  
+  const isAnime = originCountries.includes('JP') && (genreIds.includes(16) || type === 'tv');
+  const isKdrama = originCountries.includes('KR') && type === 'tv';
+
   const PER_SOURCE_TIMEOUT = 30_000;
 
   // 1. Ejecutar Scrapers de manera INTELIGENTE (Ahorro Masivo de CPU)
-  const scraperPromises = [
-    // Cuevana es el rey del Latino, siempre corre.
-    getCuevanaEmbedUrls({ title: mediaInfo.title, originalTitle: mediaInfo.originalTitle, year: mediaInfo.year, type, season, episode }).catch(() => [])
-  ];
+  const scraperPromises = [];
 
-  // 🔥 CONDICIÓN CRÍTICA: Solo abrir los scrapers extra si es una Serie (TV)
-  if (type === 'tv') {
-    console.log(' 📺 [Extractor] Modo Serie: Añadiendo PelisPlus y Scrapers de Anime');
-    scraperPromises.push(getPelisPlusSeriesEmbeds({ title: mediaInfo.title, season, episode }).catch(() => []));
+  // 🔥 CONDICIÓN CRÍTICA: Ruteo Inteligente
+  if (type === 'movie') {
+    const isAsianMovie = originCountries.some(c => ['KR', 'JP', 'CN', 'TH', 'TW'].includes(c));
+    console.log(` 🎬 [Extractor] Modo Película: Usando Cuevana${isAsianMovie ? ' + DoramasFlix' : ''} y Torrentio`);
+    
+    scraperPromises.push(getCuevanaEmbedUrls({ title: mediaInfo.title, originalTitle: mediaInfo.originalTitle, year: mediaInfo.year, type, season, episode }).catch(() => []));
+    
+    if (isAsianMovie) {
+      scraperPromises.push(getDoramasFlixMovieEmbeds({ title: mediaInfo.title, originalTitle: mediaInfo.originalTitle }).catch(() => []));
+    }
+  } else if (isAnime) {
+    console.log(' 🎌 [Extractor] Modo Anime: Añadiendo PelisPlus(Anime), AnimeFLV, JKAnime');
+    scraperPromises.push(getPelisPlusAnimeEmbeds({ title: mediaInfo.title, season, episode }).catch(() => []));
     scraperPromises.push(getAnimeFLVEmbedUrls({ title: mediaInfo.title, type, season, episode }).catch(() => []));
     scraperPromises.push(getJKAnimeEmbedUrls({ title: mediaInfo.title, type, season, episode }).catch(() => []));
+  } else if (isKdrama) {
+    console.log(' 🇰🇷 [Extractor] Modo Kdrama: Añadiendo DoramasFlix');
+    scraperPromises.push(getDoramasFlixEpisodeEmbeds({ title: mediaInfo.title, originalTitle: mediaInfo.originalTitle, season, episode }).catch(() => []));
   } else {
-    console.log(' 🎬 [Extractor] Modo Película: Usando SOLO Cuevana y Torrentio para máxima velocidad');
+    console.log(' 📺 [Extractor] Modo Serie: Añadiendo PelisPlus(Serie)');
+    scraperPromises.push(getPelisPlusSeriesEmbeds({ title: mediaInfo.title, season, episode }).catch(() => []));
   }
 
   const resultsArray = await Promise.all(scraperPromises);
   const allScraperEmbeds = resultsArray.flat();
   const scraperResults = [];
 
-  // Extraer links de los embeds de scrapers
+  // ⚡ MODO EMBED (ANTI-BOT): Ya no extraemos el MP4 crudo. 
+  // Enviamos el iframe directo a la app para evitar el Error 502 y hacer la búsqueda instantánea.
   const scraperTasks = allScraperEmbeds.map(embed => async () => {
-    const rawUrl = await trySourceExtraction({ embedUrl: embed.embedUrl, sourceId: embed.id, timeoutMs: PER_SOURCE_TIMEOUT });
-    if (rawUrl) {
-      const { url, directUrl, type: st } = toProxyUrl(rawUrl, embed.embedUrl);
-      scraperResults.push({
-        server: embed.name,
-        language: embed.language || 'Latino',
-        quality: embed.qualityHint || detectQualityFromUrl(rawUrl),
-        url, directUrl, type: st, sourceId: embed.id
-      });
-    }
+    scraperResults.push({
+      server: embed.name,
+      language: embed.language || 'Latino',
+      quality: embed.qualityHint || 'HD',
+      url: embed.embedUrl,       // El link original del iframe
+      directUrl: embed.embedUrl,
+      type: 'embed',             // 👈 ESTO ES MAGIA. Le dice a tu frontend que use un Iframe.
+      sourceId: embed.id
+    });
   });
   await Promise.all(scraperTasks.map(t => t()));
 
@@ -306,14 +323,32 @@ export async function resolveTmdbMovie(title, year) {
   const { data } = await tmdb.get('/search/movie', { params: { query: title, year } });
   if (!data.results?.length) throw new AppError('No encontrado en TMDB', 404);
   const m = data.results[0];
-  return { tmdbId: String(m.id), title: m.title, originalTitle: m.original_title, year: m.release_date?.split('-')[0], posterPath: `https://image.tmdb.org/t/p/w500${m.poster_path}`, overview: m.overview };
+  return { 
+    tmdbId: String(m.id), 
+    title: m.title, 
+    originalTitle: m.original_title, 
+    year: m.release_date?.split('-')[0], 
+    posterPath: `https://image.tmdb.org/t/p/w500${m.poster_path}`, 
+    overview: m.overview,
+    originCountry: m.origin_country || [],
+    genreIds: m.genre_ids || []
+  };
 }
 
 export async function resolveTmdbTv(title) {
   const { data } = await tmdb.get('/search/tv', { params: { query: title } });
   if (!data.results?.length) throw new AppError('No encontrado en TMDB', 404);
   const s = data.results[0];
-  return { tmdbId: String(s.id), title: s.name, originalTitle: s.original_name, year: s.first_air_date?.split('-')[0], posterPath: `https://image.tmdb.org/t/p/w500${s.poster_path}`, overview: s.overview };
+  return { 
+    tmdbId: String(s.id), 
+    title: s.name, 
+    originalTitle: s.original_name, 
+    year: s.first_air_date?.split('-')[0], 
+    posterPath: `https://image.tmdb.org/t/p/w500${s.poster_path}`, 
+    overview: s.overview,
+    originCountry: s.origin_country || [],
+    genreIds: s.genre_ids || []
+  };
 }
 
 // Backward compat

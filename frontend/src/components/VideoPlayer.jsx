@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
+import { getBackendURL } from '../config.js';
 // WebTorrent se importa dinámicamente cuando se necesita (evita errores de build)
 
 // ── Helpers de idioma ─────────────────────────────────────────────────────────
@@ -267,104 +268,35 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
 
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
     
-    // Limpiar WebTorrent anterior
+    // Limpiar torrent anterior si existe
     if (torrentRef.current) {
       torrentRef.current.destroy();
       torrentRef.current = null;
     }
 
-    // ── TORRENT (magnet links con WebTorrent) ──────────────────────────────
+    // ── TORRENT (convertir magnet a HTTP via backend proxy) ────────────────
     if (streamType === 'torrent') {
-      console.log('[Player] 🧲 Reproduciendo torrent:', streamUrl);
+      console.log('[Player] 🧲 Torrent detectado, usando proxy del backend');
       
-      // Importar WebTorrent dinámicamente (solo cuando se necesita)
-      import('webtorrent').then(({ default: WebTorrent }) => {
-        // Inicializar WebTorrent client (reutilizar si existe)
-        if (!torrentClientRef.current) {
-          torrentClientRef.current = new WebTorrent({
-            maxConns: 100,        // Máximo 100 conexiones simultáneas
-            downloadLimit: -1,     // Sin límite de descarga
-            uploadLimit: 1024000,  // Límite de subida: 1 MB/s (ser buen peer pero no saturar)
-          });
-        }
-        
-        const client = torrentClientRef.current;
-        
-        // Agregar torrent
-        client.add(streamUrl, (torrent) => {
-          console.log('[WebTorrent] Torrent agregado:', torrent.name);
-          torrentRef.current = torrent;
-          
-          // Encontrar archivo de video más grande
-          const videoFile = torrent.files
-            .filter(f => /\.(mp4|mkv|avi|webm|mov)$/i.test(f.name))
-            .sort((a, b) => b.length - a.length)[0];
-          
-          if (!videoFile) {
-            setError('No se encontró archivo de video en el torrent');
-            setLoading(false);
-            return;
-          }
-          
-          console.log('[WebTorrent] Archivo seleccionado:', videoFile.name, `(${(videoFile.length / 1024 / 1024).toFixed(2)} MB)`);
-          
-          // Renderizar video
-          videoFile.renderTo(video, {
-            autoplay: true,
-            controls: false,
-          }, (err) => {
-            if (err) {
-              console.error('[WebTorrent] Error al renderizar:', err);
-              setError(`Error al reproducir torrent: ${err.message}`);
-              setLoading(false);
-            } else {
-              console.log('[WebTorrent] Video renderizado correctamente');
-              setLoading(false);
-            }
-          });
-          
-          // Actualizar progreso cada 500ms
-          const progressInterval = setInterval(() => {
-            if (torrent.progress >= 0) {
-              setTorrentProgress((torrent.progress * 100).toFixed(1));
-            }
-            setTorrentSpeed((torrent.downloadSpeed / 1024).toFixed(0)); // KB/s
-            setTorrentPeers(torrent.numPeers);
-            
-            // Si ya descargó suficiente, puede empezar a reproducir
-            if (torrent.progress > 0.01 && loading) {
-              setLoading(false);
-            }
-          }, 500);
-          
-          torrent.on('done', () => {
-            console.log('[WebTorrent] ✅ Descarga completa');
-            setTorrentProgress(100);
-            clearInterval(progressInterval);
-          });
-          
-          torrent.on('error', (err) => {
-            console.error('[WebTorrent] ❌ Error:', err);
-            setError(`Error en torrent: ${err.message}`);
-            setLoading(false);
-            clearInterval(progressInterval);
-          });
-          
-          // Cleanup interval cuando se desmonte
-          return () => clearInterval(progressInterval);
-        });
-      }).catch((err) => {
-        console.error('[Player] Error al cargar WebTorrent:', err);
-        setError('No se pudo cargar el reproductor de torrents');
-        setLoading(false);
+      // Convertir magnet link a URL del proxy backend
+      const backendURL = getBackendURL().replace('/api', ''); // Quitar /api del final
+      const proxyUrl = `${backendURL}/api/torrent/stream?magnet=${encodeURIComponent(streamUrl)}`;
+      
+      console.log('[Player] Proxy URL:', proxyUrl);
+      
+      // Usar el reproductor HTTP normal con la URL del proxy
+      video.src = proxyUrl;
+      video.load();
+      video.play().catch(err => {
+        console.error('[Player] Error al reproducir torrent via proxy:', err);
+        setError(`Error al reproducir: ${err.message}`);
       });
       
-      // Retorno temprano para torrents (el resto se maneja en el callback)
+      setLoading(false);
+      
+      // Cleanup
       return () => {
-        if (torrentRef.current) {
-          torrentRef.current.destroy();
-          torrentRef.current = null;
-        }
+        video.src = '';
       };
     } else if (streamType === 'hls' && Hls.isSupported()) {
       const hls = new Hls(HLS_CONFIG);

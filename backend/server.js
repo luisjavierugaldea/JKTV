@@ -27,6 +27,7 @@ import tmdbRouter from './routes/tmdb.js';
 import streamRouter from './routes/stream.js';
 import proxyStreamRouter from './routes/proxyStream.js';
 import animeRouter from './routes/anime.js';
+import torrentProxyRouter from './routes/torrentProxy.js';
 
 // Browser pool (para cierre limpio en shutdown)
 import { closeBrowser } from './scrapers/browserPool.js';
@@ -126,6 +127,7 @@ app.use('/api/tmdb', tmdbRouter);
 app.use('/api/stream', streamRouter);
 app.use('/api/proxy-stream', proxyStreamRouter);
 app.use('/api/anime', animeRouter);
+app.use('/api/torrent', torrentProxyRouter);
 
 // Ruta de fallback para endpoints no existentes
 app.use((_req, res) => {

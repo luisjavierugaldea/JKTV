@@ -154,7 +154,7 @@ async function trySourceExtraction({ embedUrl, sourceId, timeoutMs, isInteractiv
 
     await page.waitForTimeout(2000);
     try { await page.mouse.click(960, 540); } catch { }
-    
+
     return await streamPromise;
   } catch (err) {
     return null;
@@ -167,8 +167,8 @@ async function trySourceExtraction({ embedUrl, sourceId, timeoutMs, isInteractiv
 export async function extractAllStreams({ title, year, type = 'movie', season = 1, episode = 1 }) {
   console.log(`\n🎬 [Extractor] Buscando: "${title}" [${type}]`);
 
-  const mediaInfo = type === 'tv' 
-    ? await resolveTmdbTv(title) 
+  const mediaInfo = type === 'tv'
+    ? await resolveTmdbTv(title)
     : await resolveTmdbMovie(title, year);
 
   const PER_SOURCE_TIMEOUT = 30_000;
@@ -246,8 +246,9 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
   return buildFinalResponse(allResults, mediaInfo, type, season, episode);
 }
 
+
 /**
- * ─── LÓGICA DE FILTRADO Y ORDENAMIENTO (TOP 5 LATINO) ───
+ * ─── LÓGICA DE FILTRADO Y ORDENAMIENTO (1 TORRENT + TOP 3 WEB) ───
  */
 function buildFinalResponse(results, mediaInfo, type, season, episode) {
   if (results.length === 0) throw new AppError('No se encontraron streams.', 404);
@@ -255,7 +256,7 @@ function buildFinalResponse(results, mediaInfo, type, season, episode) {
   // Prioridad de idiomas (0 es lo más importante)
   const LANG_PRIO = { 'Latino': 0, 'Español Latino': 0, 'Castellano': 1, 'Subtitulado': 2, 'Inglés': 3 };
 
-  // 1. Ordenar por Idioma y luego por Calidad (1080p > 720p)
+  // 1. Ordenar TODOS los resultados por Idioma y luego por Calidad (1080p > 720p)
   results.sort((a, b) => {
     const pA = LANG_PRIO[a.language] ?? 99;
     const pB = LANG_PRIO[b.language] ?? 99;
@@ -266,18 +267,32 @@ function buildFinalResponse(results, mediaInfo, type, season, episode) {
     return qB - qA;
   });
 
-  // 2. Filtrar preferiblemente Latinos
-  let finalSelection = results.filter(s => s.language.includes('Latino'));
+  // 2. Buscar preferiblemente los que estén en Latino
+  let pool = results.filter(s => s.language.includes('Latino'));
 
-  // 3. Si no hay latinos, tomamos los mejores que existan
-  if (finalSelection.length === 0) {
-    finalSelection = results;
+  if (pool.length === 0) {
+    pool = results;
   }
 
-  // 4. LIMITAR AL TOP 5
-  finalSelection = finalSelection.slice(0, 5);
+  // 3. Separar en dos "Cajas" (Torrents vs Web)
+  const torrentStreams = pool.filter(s => s.type === 'torrent' || (s.server && s.server.toLowerCase().includes('torrentio')));
+  const webStreams = pool.filter(s => s.type !== 'torrent' && !(s.server && s.server.toLowerCase().includes('torrentio')));
 
-  console.log(`[Extractor] ✅ Enviando ${finalSelection.length} mejores resultados.`);
+  let finalSelection = [];
+
+  // 4. Extraer el Rey de los Torrents (Solo 1, el mejor)
+  if (torrentStreams.length > 0) {
+    finalSelection.push(torrentStreams[0]);
+  }
+
+  // 5. Extraer el Top 3 de la Web (Para tener red de seguridad anti-502)
+  if (webStreams.length > 0) {
+    // Tomamos hasta 3 servidores. Si hay Filemoon o Streamwish, estarán aquí.
+    const topWeb = webStreams.slice(0, 3);
+    finalSelection = [...finalSelection, ...topWeb];
+  }
+
+  console.log(`[Extractor] ✅ Selección Final: 1 Torrent + ${webStreams.slice(0, 3).length} Web`);
 
   return {
     success: true,

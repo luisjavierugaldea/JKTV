@@ -73,35 +73,35 @@ function findSpanishTrack(tracks) {
 // ── Configuración HLS ─────────────────────────────────────────────────────────
 const HLS_CONFIG = {
   // ── Buffer ────────────────────────────────────────────────────────────────
-  maxBufferLength:       120,
-  maxMaxBufferLength:    180,
-  maxBufferSize:         500 * 1024 * 1024,
-  maxBufferHole:         0.5,
-  backBufferLength:       30,
-  startFragPrefetch:     true,
-  progressive:           true,
-  enableWorker:          true,
-  lowLatencyMode:        false,
+  maxBufferLength: 120,
+  maxMaxBufferLength: 180,
+  maxBufferSize: 500 * 1024 * 1024,
+  maxBufferHole: 0.5,
+  backBufferLength: 30,
+  startFragPrefetch: true,
+  progressive: true,
+  enableWorker: true,
+  lowLatencyMode: false,
 
   // ── ABR ────────────────────────────────────────────────────────────────────
   abrEwmaDefaultEstimate: 50_000_000,
-  startLevel:            -1,
-  capLevelToPlayerSize:  false,
-  abrBandWidthFactor:    0.75,
-  abrBandWidthUpFactor:  0.95,
-  abrEwmaFast:           8.0,
-  abrEwmaSlow:           20.0,
-  abrEwmaFastLive:       5.0,
-  abrEwmaSlowLive:       12.0,
+  startLevel: -1,
+  capLevelToPlayerSize: false,
+  abrBandWidthFactor: 0.75,
+  abrBandWidthUpFactor: 0.95,
+  abrEwmaFast: 8.0,
+  abrEwmaSlow: 20.0,
+  abrEwmaFastLive: 5.0,
+  abrEwmaSlowLive: 12.0,
 
   // ── Tiempos / reintentos ───────────────────────────────────────────────────
-  manifestLoadingTimeOut:  20_000,
+  manifestLoadingTimeOut: 20_000,
   manifestLoadingMaxRetry: 4,
-  levelLoadingTimeOut:     20_000,
-  levelLoadingMaxRetry:    4,
-  fragLoadingTimeOut:      20_000,
-  fragLoadingMaxRetry:     6,
-  fragLoadingRetryDelay:   300,
+  levelLoadingTimeOut: 20_000,
+  levelLoadingMaxRetry: 4,
+  fragLoadingTimeOut: 20_000,
+  fragLoadingMaxRetry: 6,
+  fragLoadingRetryDelay: 300,
   xhrSetup: (xhr) => { xhr.timeout = 20_000; },
 };
 
@@ -191,32 +191,33 @@ function ControlBadge({ label, title: tipTitle, onClick, style: s }) {
 
 // ── VideoPlayer ───────────────────────────────────────────────────────────────
 export default function VideoPlayer({ streamUrl, streamType, title }) {
-  const videoRef     = useRef(null);
-  const hlsRef       = useRef(null);
+  const videoRef = useRef(null);
+  const hlsRef = useRef(null);
   const containerRef = useRef(null);
-  const torrentClientRef = useRef(null); 
-  const torrentRef = useRef(null);       
+  const torrentClientRef = useRef(null);
+  const torrentRef = useRef(null);
 
-  const [error,       setError]       = useState(null);
-  const [loading,     setLoading]     = useState(true);
-  const [levels,      setLevels]      = useState([]);       
-  const [activeLevel, setActiveLevel] = useState(0);        
+  const [error, setError] = useState(null);
+  const [nativeUrl, setNativeUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [levels, setLevels] = useState([]);
+  const [activeLevel, setActiveLevel] = useState(0);
   const [audioTracks, setAudioTracks] = useState([]);
   const [activeAudio, setActiveAudio] = useState(-1);
-  const [bandwidth,   setBandwidth]   = useState(null);
-  const [realLevel,   setRealLevel]   = useState(0);        
+  const [bandwidth, setBandwidth] = useState(null);
+  const [realLevel, setRealLevel] = useState(0);
   const [showQuality, setShowQuality] = useState(false);
-  const [showAudio,   setShowAudio]   = useState(false);
+  const [showAudio, setShowAudio] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [torrentProgress, setTorrentProgress] = useState(0); 
-  const [torrentSpeed, setTorrentSpeed] = useState(0);       
-  const [torrentPeers, setTorrentPeers] = useState(0);       
+  const [torrentProgress, setTorrentProgress] = useState(0);
+  const [torrentSpeed, setTorrentSpeed] = useState(0);
+  const [torrentPeers, setTorrentPeers] = useState(0);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen().catch(() => {});
+      containerRef.current?.requestFullscreen().catch(() => { });
     } else {
-      document.exitFullscreen().catch(() => {});
+      document.exitFullscreen().catch(() => { });
     }
   }, []);
 
@@ -228,7 +229,7 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
 
   const switchQuality = useCallback((levelIdx) => {
     if (!hlsRef.current) return;
-    hlsRef.current.currentLevel = levelIdx;  
+    hlsRef.current.currentLevel = levelIdx;
     setActiveLevel(levelIdx);
     setShowQuality(false);
   }, []);
@@ -255,62 +256,55 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
     setTorrentProgress(0);
     setTorrentSpeed(0);
     setTorrentPeers(0);
+    setNativeUrl(null);
 
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
-    
+
     if (torrentRef.current) {
       torrentRef.current.destroy();
       torrentRef.current = null;
     }
 
-    // ── TORRENT (convertir magnet a HTTP via backend proxy) ────────────────
-    if (streamType === 'torrent') {
-      console.log('[Player] 🧲 Torrent detectado, usando proxy del backend');
-      
-      const backendURL = API_BASE_URL.replace('/api', ''); 
-      const proxyUrl = `${backendURL}/api/torrent/stream?magnet=${encodeURIComponent(streamUrl)}`;
-      
-      console.log('[Player] Proxy URL:', proxyUrl);
+    // 🛑 DIVISIÓN DE ENTORNOS: Capacitor (APK/TV) vs Web (Navegador) 🛑
+    if (Capacitor.isNativePlatform() && streamType !== 'embed') {
+      console.log('[Player] 📱 Entorno Nativo: Preparando reproductor externo (VLC)...');
+      setLoading(false);
 
-      // 🛑 DIVISIÓN DE ENTORNOS: Capacitor (APK/TV) vs Web (Navegador) 🛑
-      if (Capacitor.isNativePlatform()) {
-        // --- MODO APK / ANDROID TV ---
-        console.log('[Player] 📱 Entorno Nativo: Preparando reproductor externo...');
-        setLoading(false);
-        setError('Iniciando reproductor nativo del sistema...');
-        
-        // Aquí puedes lanzar un Intent hacia VLC o usar un plugin nativo de video.
-        // Ejemplo de Intent web temporal (puedes reemplazarlo por tu plugin nativo después):
-        // window.location.href = `intent:${proxyUrl}#Intent;package=org.videolan.vlc;type=video/*;end`;
-
-      } else {
-        // --- MODO WEB (Chrome/Edge en PC) ---
-        console.log('[Player] 💻 Entorno Web: Intentando usar etiqueta <video>');
-        video.src = proxyUrl;
-        video.load();
-        
-        video.play().catch(err => {
-          // Ignorar el error inofensivo de cuando React recarga el video rápido
-          if (err.name === 'AbortError') {
-            console.log('[Player] Play interrumpido por recarga (AbortError). Ignorando...');
-            return; 
-          }
-          
-          console.error('[Player] Error al reproducir torrent via proxy:', err);
-          setError(`Error al reproducir video: ${err.message || 'El backend está transcodificando, espera unos segundos...'}`);
-        });
-        
-        setLoading(false);
+      let finalUrl = streamUrl;
+      if (streamType === 'torrent') {
+        const backendURL = API_BASE_URL.replace('/api', '');
+        // Ojo: Para VLC nativo le mandamos el stream directo, no el HLS, porque VLC lee MKV nativo bien
+        finalUrl = `${backendURL}/api/torrent/stream?magnet=${encodeURIComponent(streamUrl)}&raw=true`;
       }
-      
-      // Cleanup
-      return () => {
-        video.src = '';
-      };
 
-    } else if (streamType === 'hls' && Hls.isSupported()) {
+      const urlWithoutScheme = finalUrl.replace(/^https?:\/\//i, '');
+      const scheme = finalUrl.startsWith('https') ? 'https' : 'http';
+      const intentUrl = `intent://${urlWithoutScheme}#Intent;package=org.videolan.vlc;type=video/*;scheme=${scheme};end;`;
+
+      console.log('[Player] Lanzando Intent VLC:', intentUrl);
+      window.location.href = intentUrl;
+      setNativeUrl(intentUrl);
+      setError('Se ha lanzado VLC para reproducir el video de forma nativa.');
+      return () => { };
+    }
+
+    // ── MODO WEB: Transformar Torrents a HLS ──
+    let activeStreamType = streamType;
+    let activeStreamUrl = streamUrl;
+
+    if (streamType === 'torrent') {
+      const backendURL = API_BASE_URL.replace('/api', '');
+      const infoHashMatch = streamUrl.match(/urn:btih:([a-f0-9]{40})/i);
+      if (infoHashMatch) {
+        console.log('[Player] 🧲 Torrent detectado, enrutando a HLS del backend');
+        activeStreamType = 'hls';
+        activeStreamUrl = `${backendURL}/api/torrent/hls/${infoHashMatch[1].toLowerCase()}/master.m3u8?magnet=${encodeURIComponent(streamUrl)}`;
+      }
+    }
+
+    if (activeStreamType === 'hls' && Hls.isSupported()) {
       const hls = new Hls(HLS_CONFIG);
-      hls.loadSource(streamUrl);
+      hls.loadSource(activeStreamUrl);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
@@ -335,7 +329,7 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
           }
         }
 
-        video.play().catch(() => {});
+        video.play().catch(() => { });
       });
 
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, { level }) => {
@@ -361,13 +355,13 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
 
     } else if (streamType === 'hls' && video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = streamUrl;
-      video.addEventListener('loadedmetadata', () => { setLoading(false); video.play().catch(() => {}); }, { once: true });
+      video.addEventListener('loadedmetadata', () => { setLoading(false); video.play().catch(() => { }); }, { once: true });
 
     } else {
       video.src = streamUrl;
       video.addEventListener('loadedmetadata', () => setLoading(false), { once: true });
       video.addEventListener('error', () => { setError('No se pudo cargar el video.'); setLoading(false); }, { once: true });
-      video.play().catch(() => {});
+      video.play().catch(() => { });
     }
 
     return () => {
@@ -399,7 +393,7 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
     return () => document.removeEventListener('click', close);
   }, [showQuality, showAudio]);
 
-  const displayIdx  = activeLevel >= 0 ? activeLevel : realLevel;
+  const displayIdx = activeLevel >= 0 ? activeLevel : realLevel;
   const qualityLabel = levels[displayIdx]?.height ? `${levels[displayIdx].height}p` : '…';
   const audioLabel = audioTracks[activeAudio] ? getLangName(audioTracks[activeAudio]) : null;
 
@@ -427,7 +421,7 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           title={title}
         />
-        
+
         <div style={{
           position: 'absolute', top: 10, right: 10, zIndex: 20,
         }}>
@@ -466,21 +460,37 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
         </div>
       )}
 
-      {/* ── Error ── */}
-      {error && !loading && (
+      {/* ── Error o Mensaje Nativo ── */}
+      {(error || nativeUrl) && !loading && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 5,
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
-          gap: 12, background: '#000', padding: 24, textAlign: 'center',
+          gap: 16, background: '#000', padding: 24, textAlign: 'center',
         }}>
-          <span style={{ fontSize: '2rem' }}>⚠️</span>
-          <p style={{ color: '#f87171', fontSize: '0.9rem', maxWidth: 360 }}>{error}</p>
+          <span style={{ fontSize: nativeUrl ? '3rem' : '2rem' }}>
+            {nativeUrl ? '🍿' : '⚠️'}
+          </span>
+          <p style={{ color: nativeUrl ? '#4ade80' : '#f87171', fontSize: '1rem', maxWidth: 360, margin: 0 }}>
+            {error || 'Lanzando reproductor...'}
+          </p>
+          {nativeUrl && (
+            <a
+              href={nativeUrl}
+              style={{
+                marginTop: 12, padding: '10px 20px', background: '#e50914',
+                color: '#fff', borderRadius: '8px', textDecoration: 'none',
+                fontWeight: 'bold', border: '1px solid #ff4d4d'
+              }}
+            >
+              Abrir VLC Manualmente
+            </a>
+          )}
         </div>
       )}
 
       {/* ── Controles OSD (esquina superior derecha) ── */}
-      {!loading && !error && (
+      {!loading && !error && !nativeUrl && (
         <div
           style={{
             position: 'absolute', top: 10, right: 10, zIndex: 20,
@@ -537,6 +547,24 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
                 </PopupMenu>
               )}
             </div>
+          )}
+
+          {/* ── Botón VLC Desktop ── */}
+          {streamType !== 'embed' && (
+            <ControlBadge
+              label="🍿 VLC"
+              title="Abrir en reproductor VLC de escritorio"
+              onClick={(e) => {
+                e.stopPropagation();
+                let finalUrl = streamUrl;
+                if (streamType === 'torrent') {
+                  const backendURL = API_BASE_URL.replace('/api', '');
+                  finalUrl = `${backendURL}/api/torrent/stream?magnet=${encodeURIComponent(streamUrl)}&raw=true`; // 👈 Agregamos raw=true
+                }
+                window.location.href = `vlc://${finalUrl}`;
+              }}
+              style={{ background: 'rgba(255,113,0,0.15)', borderColor: 'rgba(255,113,0,0.3)', color: '#ffaf7a' }}
+            />
           )}
 
           <ControlBadge

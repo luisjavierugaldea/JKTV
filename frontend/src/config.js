@@ -4,12 +4,12 @@
  */
 
 // 🎯 CAMBIAR AQUÍ: 'dev' o 'prod'
-const MODE = 'prod'; // 👈 Usar backend LOCAL porque Render está caído
+const MODE = 'dev'; // 👈 Usar backend LOCAL porque Render está caído
 
 const config = {
   dev: {
     // Backend local (tu PC)
-    backendURL: 'http://localhost:3001/api', // 👈 Se cambió a localhost
+    backendURL: 'http://192.168.0.6:3001/api', // 👈 Se cambió a localhost
     description: 'Desarrollo Local - Backend en tu PC',
   },
   prod: {

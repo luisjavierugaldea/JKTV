@@ -2,10 +2,13 @@
  * routes/torrentProxy.js
  * Proxy para convertir magnet links a HTTP streaming
  * WebTorrent solo funciona en Node.js, no en navegadores modernos
+ * Con transcodificación FFmpeg para MKV → MP4
  */
 import express from 'express';
 import WebTorrent from 'webtorrent';
 import pump from 'pump';
+import ffmpeg from 'fluent-ffmpeg';
+import { spawn } from 'child_process';
 
 const router = express.Router();
 
@@ -72,30 +75,86 @@ router.get('/stream', async (req, res) => {
     console.log(`[TorrentProxy] 📹 Archivo: ${videoFile.name} (${(videoFile.length / 1024 / 1024).toFixed(2)} MB)`);
     console.log(`[TorrentProxy] 👥 Peers: ${torrent.numPeers}, Descargado: ${(torrent.progress * 100).toFixed(1)}%`);
 
-    // Headers para streaming
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Content-Length', videoFile.length);
-    res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Detectar si necesita transcodificación (MKV, AVI, MOV → MP4)
+    const needsTranscoding = /\.(mkv|avi|mov)$/i.test(videoFile.name);
+    
+    if (needsTranscoding) {
+      console.log(`[TorrentProxy] 🎬 Transcodificando ${videoFile.name} → MP4`);
+      
+      // Headers para streaming MP4
+      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('Accept-Ranges', 'none'); // FFmpeg no soporta range requests
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Transfer-Encoding', 'chunked');
 
-    // Soporte para Range requests (seek en el video)
-    const range = req.headers.range;
-    if (range) {
-      const parts = range.replace(/bytes=/, '').split('-');
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : videoFile.length - 1;
-      const chunksize = (end - start) + 1;
+      // Crear stream del archivo del torrent
+      const videoStream = videoFile.createReadStream();
 
-      res.status(206);
-      res.setHeader('Content-Range', `bytes ${start}-${end}/${videoFile.length}`);
-      res.setHeader('Content-Length', chunksize);
+      // FFmpeg transcoding: MKV → MP4 (h264 + aac)
+      const ffmpegProcess = ffmpeg(videoStream)
+        .videoCodec('libx264')          // H.264 video (compatible con todos los navegadores)
+        .audioCodec('aac')               // AAC audio (compatible con todos los navegadores)
+        .outputOptions([
+          '-preset ultrafast',           // Velocidad máxima (baja calidad pero funcional)
+          '-crf 28',                     // Calidad (23=alta, 28=media, 32=baja)
+          '-movflags frag_keyframe+empty_moov+faststart', // Streaming progresivo
+          '-max_muxing_queue_size 1024', // Buffer para evitar drops
+          '-tune zerolatency'            // Latencia mínima
+        ])
+        .format('mp4')                   // Output format
+        .on('start', (cmd) => {
+          console.log(`[FFmpeg] Comando: ${cmd}`);
+        })
+        .on('error', (err) => {
+          console.error('[FFmpeg] ❌ Error:', err.message);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Error al transcodificar video', details: err.message });
+          }
+        })
+        .on('end', () => {
+          console.log('[FFmpeg] ✅ Transcodificación completada');
+        });
 
-      const stream = videoFile.createReadStream({ start, end });
-      pump(stream, res);
+      // Pipe FFmpeg output directamente a la respuesta HTTP
+      ffmpegProcess.pipe(res, { end: true });
+
+      res.on('close', () => {
+        console.log('[TorrentProxy] Cliente desconectado, deteniendo FFmpeg');
+        ffmpegProcess.kill('SIGKILL');
+      });
+
     } else {
-      // Sin range, enviar todo el archivo
-      const stream = videoFile.createReadStream();
-      pump(stream, res);
+      // MP4 directo sin transcodificar (más eficiente)
+      console.log(`[TorrentProxy] 📹 Sirviendo MP4 directo (sin transcodificar)`);
+      
+      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('Content-Length', videoFile.length);
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+
+      // Soporte para Range requests (seek en el video)
+      const range = req.headers.range;
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : videoFile.length - 1;
+        const chunksize = (end - start) + 1;
+
+        res.status(206);
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${videoFile.length}`);
+        res.setHeader('Content-Length', chunksize);
+
+        const stream = videoFile.createReadStream({ start, end });
+        pump(stream, res);
+      } else {
+        // Sin range, enviar todo el archivo
+        const stream = videoFile.createReadStream();
+        pump(stream, res);
+      }
+
+      res.on('close', () => {
+        console.log('[TorrentProxy] Cliente desconectado');
+      });
     }
 
     // Limpiar torrent después de 10 minutos sin uso
@@ -107,14 +166,9 @@ router.get('/stream', async (req, res) => {
       }
     }, 10 * 60 * 1000);
 
-    res.on('close', () => {
-      console.log('[TorrentProxy] Cliente desconectado');
-      clearTimeout(cleanupTimer);
-    });
-
   } catch (error) {
     console.error('[TorrentProxy] ❌ Error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error al procesar torrent',
       details: error.message 
     });

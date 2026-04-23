@@ -157,6 +157,18 @@ async function startServer(isRetry = false) {
       console.log(`\n    Origenes CORS permitidos:`);
       config.cors.allowedOrigins.forEach((o) => console.log(`      • ${o}`));
       console.log('\n    ✅  Servidor listo. Esperando peticiones...\n');
+      
+      // Verificar FFmpeg (necesario para transcodificar MKV → MP4)
+      try {
+        execSync('ffmpeg -version', { stdio: 'ignore' });
+        console.log('    🎬  FFmpeg detectado - Transcodificación MKV→MP4 disponible\n');
+      } catch (err) {
+        console.log('    ⚠️  FFmpeg NO detectado - Los torrents MKV/AVI no funcionarán');
+        console.log('    📥  Instala FFmpeg:');
+        console.log('        Windows: https://www.gyan.dev/ffmpeg/builds/ (descarga y agrega a PATH)');
+        console.log('        macOS:   brew install ffmpeg');
+        console.log('        Linux:   sudo apt install ffmpeg\n');
+      }
     });
     
     server.on('error', async (err) => {

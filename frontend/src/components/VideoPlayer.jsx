@@ -1,16 +1,18 @@
 /**
  * components/VideoPlayer.jsx
  * Reproductor HLS/MP4/WebTorrent con:
- *  - Selector de CALIDAD nativo tipo Netflix (⚙️ engranaje)
- *  - Selector de IDIOMA de audio (🔊)
- *  - Auto-selección de español al cargar
- *  - Buffer agresivo + retries automáticos
- *  - Badge de velocidad en tiempo real
- *  - Soporte para torrents vía WebTorrent (🧲)
+ * - Selector de CALIDAD nativo tipo Netflix (⚙️ engranaje)
+ * - Selector de IDIOMA de audio (🔊)
+ * - Auto-selección de español al cargar
+ * - Buffer agresivo + retries automáticos
+ * - Badge de velocidad en tiempo real
+ * - Soporte para torrents vía WebTorrent (🧲) y Capacitor para APKs nativos
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
-import { getBackendURL } from '../config.js';
+import { API_BASE_URL } from '../config.js';
+import { Capacitor } from '@capacitor/core'; // 👈 Importación nativa agregada
+
 // WebTorrent se importa dinámicamente cuando se necesita (evita errores de build)
 
 // ── Helpers de idioma ─────────────────────────────────────────────────────────
@@ -68,14 +70,12 @@ function findSpanishTrack(tracks) {
   return -1;
 }
 
-
 // ── Configuración HLS ─────────────────────────────────────────────────────────
 const HLS_CONFIG = {
   // ── Buffer ────────────────────────────────────────────────────────────────
-  // 120s buffereados = más cache, menos buffering en servidores lentos Latino
   maxBufferLength:       120,
   maxMaxBufferLength:    180,
-  maxBufferSize:         500 * 1024 * 1024, // 500 MB (aumentado para más cache)
+  maxBufferSize:         500 * 1024 * 1024,
   maxBufferHole:         0.5,
   backBufferLength:       30,
   startFragPrefetch:     true,
@@ -84,24 +84,14 @@ const HLS_CONFIG = {
   lowLatencyMode:        false,
 
   // ── ABR ────────────────────────────────────────────────────────────────────
-  // Arranca asumiendo 50 Mbps → elige 1080p desde el primer segmento SIN switch abrupto
   abrEwmaDefaultEstimate: 50_000_000,
   startLevel:            -1,
   capLevelToPlayerSize:  false,
-
-  // Conservador: solo usa el 75% del ancho de banda medido para elegir calidad.
-  // Crea margen de seguridad contra picos de latencia del proxy.
   abrBandWidthFactor:    0.75,
-
-  // Solo sube de calidad cuando tiene 95% de confianza sostenida en el ancho de banda.
-  // Impide el ciclo sube↕baja que causaba los microcortes cada 4s.
   abrBandWidthUpFactor:  0.95,
-
-  // EWMA para VOD (películas) — abrEwmaFastLive/SlowLive solo aplican a streams en VIVO.
-  // Valores altos = reacción lenta a picos de latencia del proxy = sin oscilaciones de calidad.
-  abrEwmaFast:           8.0,    // VOD: tarda ~8 segmentos en reaccionar a bajada de velocidad
-  abrEwmaSlow:           20.0,   // VOD: promedio muy suave, ignora picos momentáneos
-  abrEwmaFastLive:       5.0,    // por si alguna fuente usa stream en vivo
+  abrEwmaFast:           8.0,
+  abrEwmaSlow:           20.0,
+  abrEwmaFastLive:       5.0,
   abrEwmaSlowLive:       12.0,
 
   // ── Tiempos / reintentos ───────────────────────────────────────────────────
@@ -109,7 +99,7 @@ const HLS_CONFIG = {
   manifestLoadingMaxRetry: 4,
   levelLoadingTimeOut:     20_000,
   levelLoadingMaxRetry:    4,
-  fragLoadingTimeOut:      20_000,    // menos tiempo de espera por segmento: falla rápido y reintenta
+  fragLoadingTimeOut:      20_000,
   fragLoadingMaxRetry:     6,
   fragLoadingRetryDelay:   300,
   xhrSetup: (xhr) => { xhr.timeout = 20_000; },
@@ -204,23 +194,23 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
   const videoRef     = useRef(null);
   const hlsRef       = useRef(null);
   const containerRef = useRef(null);
-  const torrentClientRef = useRef(null); // WebTorrent client
-  const torrentRef = useRef(null);       // Torrent instance
+  const torrentClientRef = useRef(null); 
+  const torrentRef = useRef(null);       
 
   const [error,       setError]       = useState(null);
   const [loading,     setLoading]     = useState(true);
-  const [levels,      setLevels]      = useState([]);       // calidades disponibles
-  const [activeLevel, setActiveLevel] = useState(0);        // índice del nivel seleccionado
+  const [levels,      setLevels]      = useState([]);       
+  const [activeLevel, setActiveLevel] = useState(0);        
   const [audioTracks, setAudioTracks] = useState([]);
   const [activeAudio, setActiveAudio] = useState(-1);
   const [bandwidth,   setBandwidth]   = useState(null);
-  const [realLevel,   setRealLevel]   = useState(0);        // nivel real que ABR está usando
+  const [realLevel,   setRealLevel]   = useState(0);        
   const [showQuality, setShowQuality] = useState(false);
   const [showAudio,   setShowAudio]   = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [torrentProgress, setTorrentProgress] = useState(0); // Progreso del torrent (0-100)
-  const [torrentSpeed, setTorrentSpeed] = useState(0);       // Velocidad de descarga (KB/s)
-  const [torrentPeers, setTorrentPeers] = useState(0);       // Número de peers conectados
+  const [torrentProgress, setTorrentProgress] = useState(0); 
+  const [torrentSpeed, setTorrentSpeed] = useState(0);       
+  const [torrentPeers, setTorrentPeers] = useState(0);       
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -238,7 +228,7 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
 
   const switchQuality = useCallback((levelIdx) => {
     if (!hlsRef.current) return;
-    hlsRef.current.currentLevel = levelIdx;  // -1 = auto, >=0 = fijo
+    hlsRef.current.currentLevel = levelIdx;  
     setActiveLevel(levelIdx);
     setShowQuality(false);
   }, []);
@@ -268,7 +258,6 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
 
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
     
-    // Limpiar torrent anterior si existe
     if (torrentRef.current) {
       torrentRef.current.destroy();
       torrentRef.current = null;
@@ -278,26 +267,47 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
     if (streamType === 'torrent') {
       console.log('[Player] 🧲 Torrent detectado, usando proxy del backend');
       
-      // Convertir magnet link a URL del proxy backend
-      const backendURL = getBackendURL().replace('/api', ''); // Quitar /api del final
+      const backendURL = API_BASE_URL.replace('/api', ''); 
       const proxyUrl = `${backendURL}/api/torrent/stream?magnet=${encodeURIComponent(streamUrl)}`;
       
       console.log('[Player] Proxy URL:', proxyUrl);
-      
-      // Usar el reproductor HTTP normal con la URL del proxy
-      video.src = proxyUrl;
-      video.load();
-      video.play().catch(err => {
-        console.error('[Player] Error al reproducir torrent via proxy:', err);
-        setError(`Error al reproducir: ${err.message}`);
-      });
-      
-      setLoading(false);
+
+      // 🛑 DIVISIÓN DE ENTORNOS: Capacitor (APK/TV) vs Web (Navegador) 🛑
+      if (Capacitor.isNativePlatform()) {
+        // --- MODO APK / ANDROID TV ---
+        console.log('[Player] 📱 Entorno Nativo: Preparando reproductor externo...');
+        setLoading(false);
+        setError('Iniciando reproductor nativo del sistema...');
+        
+        // Aquí puedes lanzar un Intent hacia VLC o usar un plugin nativo de video.
+        // Ejemplo de Intent web temporal (puedes reemplazarlo por tu plugin nativo después):
+        // window.location.href = `intent:${proxyUrl}#Intent;package=org.videolan.vlc;type=video/*;end`;
+
+      } else {
+        // --- MODO WEB (Chrome/Edge en PC) ---
+        console.log('[Player] 💻 Entorno Web: Intentando usar etiqueta <video>');
+        video.src = proxyUrl;
+        video.load();
+        
+        video.play().catch(err => {
+          // Ignorar el error inofensivo de cuando React recarga el video rápido
+          if (err.name === 'AbortError') {
+            console.log('[Player] Play interrumpido por recarga (AbortError). Ignorando...');
+            return; 
+          }
+          
+          console.error('[Player] Error al reproducir torrent via proxy:', err);
+          setError(`Error al reproducir video: ${err.message || 'El backend está transcodificando, espera unos segundos...'}`);
+        });
+        
+        setLoading(false);
+      }
       
       // Cleanup
       return () => {
         video.src = '';
       };
+
     } else if (streamType === 'hls' && Hls.isSupported()) {
       const hls = new Hls(HLS_CONFIG);
       hls.loadSource(streamUrl);
@@ -306,17 +316,13 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         setLoading(false);
 
-        // ── Niveles de calidad ─────────────────────────────────────────────
         const lvls = hls.levels ?? [];
         setLevels(lvls);
-        // Arrancar siempre en la calidad más alta disponible.
-        // Es seguro antes de video.play() porque el buffer está vacío.
         const highestIdx = lvls.length > 0 ? lvls.length - 1 : 0;
         hls.currentLevel = highestIdx;
         setActiveLevel(highestIdx);
         setRealLevel(highestIdx);
 
-        // ── Pistas de audio ────────────────────────────────────────────────
         const tracks = hls.audioTracks ?? [];
         setAudioTracks(tracks);
         if (tracks.length > 0) {
@@ -333,7 +339,6 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
       });
 
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, { level }) => {
-        // Actualiza el nivel real que ABR está usando (para el badge)
         setRealLevel(level);
       });
 
@@ -377,7 +382,6 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
     };
   }, [streamUrl, streamType]);
 
-  // Cleanup: Destruir WebTorrent client cuando el componente se desmonte
   useEffect(() => {
     return () => {
       if (torrentClientRef.current) {
@@ -388,7 +392,6 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
     };
   }, []);
 
-  // Cerrar menús al clicar fuera
   useEffect(() => {
     if (!showQuality && !showAudio) return;
     const close = (e) => { setShowQuality(false); setShowAudio(false); };
@@ -396,13 +399,10 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
     return () => document.removeEventListener('click', close);
   }, [showQuality, showAudio]);
 
-  // Badge de calidad: muestra el nivel activo (siempre un nivel fijo, sin Auto)
   const displayIdx  = activeLevel >= 0 ? activeLevel : realLevel;
   const qualityLabel = levels[displayIdx]?.height ? `${levels[displayIdx].height}p` : '…';
-
   const audioLabel = audioTracks[activeAudio] ? getLangName(audioTracks[activeAudio]) : null;
 
-  // Si es un iframe embebido, renderizar iframe directamente
   if (streamType === 'embed') {
     return (
       <div
@@ -428,7 +428,6 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
           title={title}
         />
         
-        {/* Botón de pantalla completa para iframe */}
         <div style={{
           position: 'absolute', top: 10, right: 10, zIndex: 20,
         }}>
@@ -540,14 +539,12 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
             </div>
           )}
 
-          {/* Botón de pantalla completa — usa el contenedor, no el video nativo */}
           <ControlBadge
             label={isFullscreen ? '⊡ Salir' : '⛶ Pantalla completa'}
             title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
             onClick={toggleFullscreen}
           />
 
-          {/* Badge de velocidad / progreso torrent */}
           {streamType === 'torrent' && (torrentProgress > 0 || torrentSpeed > 0) && (
             <span style={{
               background: 'rgba(0,0,0,0.75)',

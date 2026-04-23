@@ -366,7 +366,6 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
           torrentRef.current = null;
         }
       };
-    }
     } else if (streamType === 'hls' && Hls.isSupported()) {
       const hls = new Hls(HLS_CONFIG);
       hls.loadSource(streamUrl);

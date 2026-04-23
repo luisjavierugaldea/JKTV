@@ -18,18 +18,30 @@ import axios from 'axios';
 const STREMIO_ADDONS = [
   {
     name: 'Torrentio',
-    baseUrl: 'https://torrentio.strem.fun',
-    // Configuración: sort=qualitysize (mejor calidad primero), lang=spanish (subtítulos español)
-    manifestUrl: 'https://torrentio.strem.fun/sort=qualitysize|qualityfilter=480p,scr,cam/manifest.json',
+    baseUrl: 'https://torrentio.strem.fun/language=latino,korean,japanese',
+    // Configuración con filtro de idiomas: Latino, Coreano, Japonés
+    manifestUrl: 'https://torrentio.strem.fun/language=latino,korean,japanese/manifest.json',
     priority: 1,
     supportsSubtitles: true,
+  },
+  {
+    name: 'MediaFusion',
+    baseUrl: 'https://mediafusion.elfhosted.com',
+    // MediaFusion convierte torrents a HTTP vía cache/debrid
+    manifestUrl: 'https://mediafusion.elfhosted.com/manifest.json',
+    priority: 2,
+    supportsSubtitles: true,
+    // NOTA: Requiere autenticación - da 403 sin API key
+    disabled: true,
   },
   {
     name: 'Comet',
     baseUrl: 'https://comet.elfhosted.com',
     manifestUrl: 'https://comet.elfhosted.com/manifest.json',
-    priority: 2,
+    priority: 3,
     supportsSubtitles: true,
+    // NOTA: Requiere API key - da 403 sin autenticación
+    disabled: true,
   },
 ];
 
@@ -186,16 +198,18 @@ async function fetchAddonStreams(addon, type, imdbId, season, episode) {
       .map(s => parseStremioStream(s, addon.name, addon.priority))
       .filter(Boolean);
     
-    // Filtrar solo HTTP/HLS (ignorar torrents por ahora, requieren cliente especial)
-    const httpStreams = parsedStreams.filter(s => 
-      s.streamType === 'http' || s.streamType === 'hls'
+    // Ahora incluimos torrents para reproducir con WebTorrent en frontend
+    const validStreams = parsedStreams.filter(s => 
+      s.streamType === 'http' || s.streamType === 'hls' || s.streamType === 'torrent'
     );
     
-    if (httpStreams.length > 0) {
-      console.log(`  📡  [Stremio/${addon.name}] ${httpStreams.length} streams HTTP/HLS disponibles`);
+    if (validStreams.length > 0) {
+      const torrentCount = validStreams.filter(s => s.streamType === 'torrent').length;
+      const httpCount = validStreams.length - torrentCount;
+      console.log(`  📡  [Stremio/${addon.name}] ${validStreams.length} streams (HTTP/HLS:${httpCount} Torrents:${torrentCount})`);
     }
     
-    return httpStreams;
+    return validStreams;
     
   } catch (error) {
     if (error.code === 'ECONNABORTED') {
@@ -225,11 +239,14 @@ export async function getStremioAddonStreams({ type, imdbId, season, episode }) 
     return [];
   }
   
-  console.log(`  🎬  [Stremio] Consultando ${STREMIO_ADDONS.length} addons para ${type} ${imdbId}...`);
+  // Filtrar addons habilitados (disabled !== true)
+  const enabledAddons = STREMIO_ADDONS.filter(addon => !addon.disabled);
+  
+  console.log(`  🎬  [Stremio] Consultando ${enabledAddons.length} addons para ${type} ${imdbId}...`);
   
   // Consultar todos los addons en paralelo
   const results = await Promise.all(
-    STREMIO_ADDONS.map(addon => 
+    enabledAddons.map(addon => 
       fetchAddonStreams(addon, type, imdbId, season, episode)
     )
   );

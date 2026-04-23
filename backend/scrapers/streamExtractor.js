@@ -669,18 +669,18 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
     // Procesar streams de Stremio (ya vienen en formato casi listo)
     for (const embed of stremioEmbeds) {
       try {
-        // Los streams de Stremio ya vienen con URL directa (HTTP/HLS)
+        // Los streams de Stremio pueden ser HTTP/HLS o torrents (magnet links)
         const result = {
           server: embed.name,
           language: embed.language,
           quality: embed.qualityHint,
-          url: embed.embedUrl, // URL directa, no necesita proxy
+          url: embed.embedUrl, // URL directa o magnet link
           directUrl: embed.embedUrl,
-          type: embed.streamType === 'hls' ? 'hls' : 'http',
+          type: embed.streamType, // 'hls', 'http', o 'torrent'
           sourceId: embed.id,
         };
         stremioStreams.push(result);
-        console.log(`  🎉  [Stremio/${embed.name}] OK → ${result.quality} ${result.language}`);
+        console.log(`  🎉  [Stremio/${embed.name}] OK → ${result.quality} ${result.language} (${result.type})`);
       } catch (err) {
         console.log(`  ⚠️  [Stremio/${embed.name}] Error: ${err.message}`);
       }

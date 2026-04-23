@@ -1,14 +1,16 @@
 /**
  * components/VideoPlayer.jsx
- * Reproductor HLS/MP4 con:
+ * Reproductor HLS/MP4/WebTorrent con:
  *  - Selector de CALIDAD nativo tipo Netflix (⚙️ engranaje)
  *  - Selector de IDIOMA de audio (🔊)
  *  - Auto-selección de español al cargar
  *  - Buffer agresivo + retries automáticos
  *  - Badge de velocidad en tiempo real
+ *  - Soporte para torrents vía WebTorrent (🧲)
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
+import WebTorrent from 'webtorrent';
 
 // ── Helpers de idioma ─────────────────────────────────────────────────────────
 const LANG_NAMES = {
@@ -201,6 +203,8 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
   const videoRef     = useRef(null);
   const hlsRef       = useRef(null);
   const containerRef = useRef(null);
+  const torrentClientRef = useRef(null); // WebTorrent client
+  const torrentRef = useRef(null);       // Torrent instance
 
   const [error,       setError]       = useState(null);
   const [loading,     setLoading]     = useState(true);
@@ -213,6 +217,9 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
   const [showQuality, setShowQuality] = useState(false);
   const [showAudio,   setShowAudio]   = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [torrentProgress, setTorrentProgress] = useState(0); // Progreso del torrent (0-100)
+  const [torrentSpeed, setTorrentSpeed] = useState(0);       // Velocidad de descarga (KB/s)
+  const [torrentPeers, setTorrentPeers] = useState(0);       // Número de peers conectados
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -254,10 +261,98 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
     setBandwidth(null);
     setShowQuality(false);
     setShowAudio(false);
+    setTorrentProgress(0);
+    setTorrentSpeed(0);
+    setTorrentPeers(0);
 
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
+    
+    // Limpiar WebTorrent anterior
+    if (torrentRef.current) {
+      torrentRef.current.destroy();
+      torrentRef.current = null;
+    }
 
-    if (streamType === 'hls' && Hls.isSupported()) {
+    // ── TORRENT (magnet links con WebTorrent) ──────────────────────────────
+    if (streamType === 'torrent') {
+      console.log('[Player] 🧲 Reproduciendo torrent:', streamUrl);
+      
+      // Inicializar WebTorrent client (reutilizar si existe)
+      if (!torrentClientRef.current) {
+        torrentClientRef.current = new WebTorrent({
+          maxConns: 100,        // Máximo 100 conexiones simultáneas
+          downloadLimit: -1,     // Sin límite de descarga
+          uploadLimit: 1024000,  // Límite de subida: 1 MB/s (ser buen peer pero no saturar)
+        });
+      }
+      
+      const client = torrentClientRef.current;
+      
+      // Agregar torrent
+      client.add(streamUrl, (torrent) => {
+        console.log('[WebTorrent] Torrent agregado:', torrent.name);
+        torrentRef.current = torrent;
+        
+        // Encontrar archivo de video más grande
+        const videoFile = torrent.files
+          .filter(f => /\.(mp4|mkv|avi|webm|mov)$/i.test(f.name))
+          .sort((a, b) => b.length - a.length)[0];
+        
+        if (!videoFile) {
+          setError('No se encontró archivo de video en el torrent');
+          setLoading(false);
+          return;
+        }
+        
+        console.log('[WebTorrent] Archivo seleccionado:', videoFile.name, `(${(videoFile.length / 1024 / 1024).toFixed(2)} MB)`);
+        
+        // Renderizar video
+        videoFile.renderTo(video, {
+          autoplay: true,
+          controls: false,
+        }, (err) => {
+          if (err) {
+            console.error('[WebTorrent] Error al renderizar:', err);
+            setError(`Error al reproducir torrent: ${err.message}`);
+            setLoading(false);
+          } else {
+            console.log('[WebTorrent] Video renderizado correctamente');
+            setLoading(false);
+          }
+        });
+        
+        // Actualizar progreso cada 500ms
+        const progressInterval = setInterval(() => {
+          if (torrent.progress >= 0) {
+            setTorrentProgress((torrent.progress * 100).toFixed(1));
+          }
+          setTorrentSpeed((torrent.downloadSpeed / 1024).toFixed(0)); // KB/s
+          setTorrentPeers(torrent.numPeers);
+          
+          // Si ya descargó suficiente, puede empezar a reproducir
+          if (torrent.progress > 0.01 && loading) {
+            setLoading(false);
+          }
+        }, 500);
+        
+        torrent.on('done', () => {
+          console.log('[WebTorrent] ✅ Descarga completa');
+          setTorrentProgress(100);
+          clearInterval(progressInterval);
+        });
+        
+        torrent.on('error', (err) => {
+          console.error('[WebTorrent] ❌ Error:', err);
+          setError(`Error en torrent: ${err.message}`);
+          setLoading(false);
+          clearInterval(progressInterval);
+        });
+        
+        // Cleanup interval cuando se desmonte
+        return () => clearInterval(progressInterval);
+      });
+      
+    } else if (streamType === 'hls' && Hls.isSupported()) {
       const hls = new Hls(HLS_CONFIG);
       hls.loadSource(streamUrl);
       hls.attachMedia(video);
@@ -324,8 +419,28 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
       video.play().catch(() => {});
     }
 
-    return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; } };
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      if (torrentRef.current) {
+        torrentRef.current.destroy();
+        torrentRef.current = null;
+      }
+    };
   }, [streamUrl, streamType]);
+
+  // Cleanup: Destruir WebTorrent client cuando el componente se desmonte
+  useEffect(() => {
+    return () => {
+      if (torrentClientRef.current) {
+        console.log('[WebTorrent] 🧹 Limpiando cliente WebTorrent');
+        torrentClientRef.current.destroy();
+        torrentClientRef.current = null;
+      }
+    };
+  }, []);
 
   // Cerrar menús al clicar fuera
   useEffect(() => {
@@ -486,8 +601,18 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
             onClick={toggleFullscreen}
           />
 
-          {/* Badge de velocidad */}
-          {bandwidth && (
+          {/* Badge de velocidad / progreso torrent */}
+          {streamType === 'torrent' && (torrentProgress > 0 || torrentSpeed > 0) && (
+            <span style={{
+              background: 'rgba(0,0,0,0.75)',
+              color: '#fff', fontSize: '0.63rem', fontWeight: 600,
+              padding: '3px 10px', borderRadius: 99,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              🧲 {torrentProgress}% • ↓{torrentSpeed} KB/s • 👥{torrentPeers}
+            </span>
+          )}
+          {streamType !== 'torrent' && bandwidth && (
             <span style={{
               background: 'rgba(0,0,0,0.6)',
               color: 'rgba(255,255,255,0.35)', fontSize: '0.63rem',

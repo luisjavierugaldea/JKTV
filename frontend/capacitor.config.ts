@@ -5,11 +5,11 @@ const config: CapacitorConfig = {
   appName: 'JKTV',
   webDir: 'dist',
   server: {
-    androidScheme: 'https',
-    cleartext: true, // Permitir HTTP local para desarrollo
+    androidScheme: 'http', // 👈 CAMBIO CRÍTICO: Se cambió 'https' por 'http'
+    cleartext: true,
   },
   android: {
-    allowMixedContent: true, // Necesario para streaming de videos
+    allowMixedContent: true,
     backgroundColor: '#0a0a0f',
   },
   plugins: {

@@ -12,8 +12,8 @@ const corsOptions = {
     // Permitir peticiones sin Origin (Postman, curl, apps nativas)
     if (!origin) return callback(null, true);
 
-    // Permitir Capacitor (apps Android/iOS)
-    if (origin.startsWith('capacitor://') || origin.startsWith('ionic://')) {
+    // Permitir Capacitor (apps Android/iOS) y el APK en modo HTTP local
+    if (origin.startsWith('capacitor://') || origin.startsWith('ionic://') || origin === 'http://localhost') {
       return callback(null, true);
     }
 

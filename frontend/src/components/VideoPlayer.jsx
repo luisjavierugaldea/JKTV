@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import { API_BASE_URL } from '../config.js';
 import { Capacitor } from '@capacitor/core'; // 👈 Importación nativa agregada
+import { CapacitorVideoPlayer } from 'capacitor-video-player';
 
 // WebTorrent se importa dinámicamente cuando se necesita (evita errores de build)
 
@@ -265,26 +266,36 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
       torrentRef.current = null;
     }
 
+    const isTorrentOrMkv = streamType === 'torrent' || streamUrl.toLowerCase().includes('.mkv');
+
     // 🛑 DIVISIÓN DE ENTORNOS: Capacitor (APK/TV) vs Web (Navegador) 🛑
-    if (Capacitor.isNativePlatform() && streamType !== 'embed') {
-      console.log('[Player] 📱 Entorno Nativo: Preparando reproductor externo (VLC)...');
+    if (Capacitor.isNativePlatform() && isTorrentOrMkv) {
+      console.log('[Player] 📱 Entorno Nativo: Reproduciendo internamente...');
       setLoading(false);
 
       let finalUrl = streamUrl;
       if (streamType === 'torrent') {
         const backendURL = API_BASE_URL.replace('/api', '');
-        // Ojo: Para VLC nativo le mandamos el stream directo, no el HLS, porque VLC lee MKV nativo bien
         finalUrl = `${backendURL}/api/torrent/stream?magnet=${encodeURIComponent(streamUrl)}&raw=true`;
       }
 
-      const urlWithoutScheme = finalUrl.replace(/^https?:\/\//i, '');
-      const scheme = finalUrl.startsWith('https') ? 'https' : 'http';
-      const intentUrl = `intent://${urlWithoutScheme}#Intent;package=org.videolan.vlc;type=video/*;scheme=${scheme};end;`;
+      // Lanzar el reproductor interno nativo
+      const playVideo = async () => {
+        try {
+          await CapacitorVideoPlayer.initPlayer({
+            mode: 'fullscreen',
+            url: finalUrl,
+            playerId: 'jktv-player',
+            componentTag: 'jktv-video'
+          });
+        } catch (err) {
+          console.error("Error al abrir reproductor interno:", err);
+          setError('Error al iniciar el reproductor nativo.');
+        }
+      };
 
-      console.log('[Player] Lanzando Intent VLC:', intentUrl);
-      window.location.href = intentUrl;
-      setNativeUrl(intentUrl);
-      setError('Se ha lanzado VLC para reproducir el video de forma nativa.');
+      playVideo();
+
       return () => { };
     }
 

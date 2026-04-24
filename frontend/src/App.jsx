@@ -193,26 +193,45 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
 
-      {/* ── Header ── */}
-      <header className="glass" style={{ position: 'sticky', top: 0, zIndex: 50, padding: '0 24px' }}>
+      <header className="glass" style={{ position: 'sticky', top: 0, zIndex: 100, padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{
           maxWidth: 1400, margin: '0 auto',
-          display: 'flex', alignItems: 'center', gap: 20, height: 64,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 70, gap: 20
         }}>
-          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: '1.5rem' }}>📺</span>
-            <span style={{
-              fontWeight: 900, fontSize: '1.15rem',
-              background: 'linear-gradient(135deg, #e50914, #ff6b6b)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              letterSpacing: '-0.02em',
-            }}>JKTV</span>
+          {/* Lado Izquierdo: Logo + Nav */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 40 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} onClick={() => { setSection('trending'); setMovies([]); setType('movie'); }}>
+              <img src="/logo.png" alt="JKTV Logo" style={{ height: 45, width: 45, borderRadius: 10, objectFit: 'cover', boxShadow: '0 0 20px rgba(229,9,20,0.4)' }} />
+              <span style={{
+                fontWeight: 900, fontSize: '1.6rem',
+                background: 'linear-gradient(135deg, #fff, #bbb)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                letterSpacing: '-0.04em',
+              }}>JKTV</span>
+            </div>
+
+            {/* Nav Tabs Desktop */}
+            <nav className="hide-mobile" style={{ display: 'flex', gap: 10 }}>
+              <button className={`tab-btn ${type === 'movie' ? 'active' : ''}`} onClick={() => setType('movie')}>Películas</button>
+              <button className={`tab-btn ${type === 'tv' ? 'active' : ''}`} onClick={() => setType('tv')}>Series</button>
+              <button className={`tab-btn ${type === 'anime' ? 'active' : ''}`} onClick={() => setType('anime')}>Anime</button>
+              <button className={`tab-btn ${type === 'kdrama' ? 'active' : ''}`} onClick={() => setType('kdrama')}>K-Drama</button>
+            </nav>
           </div>
 
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <SearchBar onSearch={handleSearch} type={type} onTypeChange={setType} />
+          {/* Lado Derecho: Buscador */}
+          <div style={{ width: '100%', maxWidth: 400 }}>
+            <SearchBar onSearch={handleSearch} type={type} />
           </div>
         </div>
+        
+        {/* Nav Tabs Mobile (Solo se ve en móvil) */}
+        <nav className="show-mobile" style={{ display: 'none', padding: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto', gap: 8 }}>
+           <button className={`tab-btn ${type === 'movie' ? 'active' : ''}`} onClick={() => setType('movie')}>🎬 Películas</button>
+           <button className={`tab-btn ${type === 'tv' ? 'active' : ''}`} onClick={() => setType('tv')}>📺 Series</button>
+           <button className={`tab-btn ${type === 'anime' ? 'active' : ''}`} onClick={() => setType('anime')}>🎌 Anime</button>
+           <button className={`tab-btn ${type === 'kdrama' ? 'active' : ''}`} onClick={() => setType('kdrama')}>🇰🇷 K-Drama</button>
+        </nav>
       </header>
 
       {/* ── Hero Banner (solo en trending) ── */}

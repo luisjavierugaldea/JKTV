@@ -490,38 +490,21 @@ body {
     border-width: 2.5px !important;
   }
 
-  /* ── Ajustes generales de texto ── */
-  body {
-    font-size: 15px !important;
+  /* ── Extra pequeñas (< 480px) ── */
+  @media (max-width: 480px) {
+    .tab-btn {
+      padding: 5px 8px !important;
+      font-size: 0.7rem !important;
+    }
   }
 
-  p {
-    font-size: 0.9rem !important;
-    line-height: 1.5 !important;
-  }
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: flex !important; }
 }
 
-/* ── Extra pequeñas (< 480px) ── */
-@media (max-width: 480px) {
-  .tab-btn {
-    padding: 5px 8px !important;
-    font-size: 0.7rem !important;
-  }
-
-  .search-input {
-    padding: 8px 12px 8px 36px !important;
-    font-size: 0.85rem !important;
-  }
-
-  .modal-content h2 {
-    font-size: 1.15rem !important;
-  }
-
-  .btn-primary,
-  .btn-ghost {
-    padding: 7px 12px !important;
-    font-size: 0.8rem !important;
-  }
+@media (min-width: 769px) {
+  .hide-mobile { display: flex !important; }
+  .show-mobile { display: none !important; }
 }
 
 /* Tarjeta en fila horizontal — ancho fijo */

@@ -68,12 +68,14 @@ const HLS_CONFIG = {
   maxBufferHole: 0.5, backBufferLength: 30, startFragPrefetch: true,
   progressive: true, enableWorker: true, lowLatencyMode: false,
   abrEwmaDefaultEstimate: 50_000_000, startLevel: -1, capLevelToPlayerSize: false,
+  startPosition: 0,
   abrBandWidthFactor: 0.75, abrBandWidthUpFactor: 0.95,
   abrEwmaFast: 8.0, abrEwmaSlow: 20.0, abrEwmaFastLive: 5.0, abrEwmaSlowLive: 12.0,
-  manifestLoadingTimeOut: 20_000, manifestLoadingMaxRetry: 4,
-  levelLoadingTimeOut: 20_000, levelLoadingMaxRetry: 4,
-  fragLoadingTimeOut: 20_000, fragLoadingMaxRetry: 6, fragLoadingRetryDelay: 300,
-  xhrSetup: (xhr) => { xhr.timeout = 20_000; },
+  // ⏱️ Tiempos ampliados a 5 minutos para aguantar torrents lentos generando segmentos
+  manifestLoadingTimeOut: 300_000, manifestLoadingMaxRetry: 20, manifestLoadingRetryDelay: 3000,
+  levelLoadingTimeOut: 300_000, levelLoadingMaxRetry: 10, levelLoadingRetryDelay: 2000,
+  fragLoadingTimeOut: 300_000, fragLoadingMaxRetry: 20, fragLoadingRetryDelay: 1000,
+  xhrSetup: (xhr) => { xhr.timeout = 300_000; },
 };
 
 // ── Componentes UI ────────────────────────────────────────────────────────────
@@ -275,8 +277,12 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
       const backendURL = API_BASE_URL.replace('/api', '');
       const infoHashMatch = streamUrl.match(/urn:btih:([a-f0-9]{40})/i);
       if (infoHashMatch) {
+        const infoHash = infoHashMatch[1].toLowerCase();
+        const soMatch = streamUrl.match(/[?&]so=(\d+)/i);
+        const fileIdx = soMatch ? soMatch[1] : '0';
+        
         activeStreamType = 'hls';
-        activeStreamUrl = `${backendURL}/api/torrent/hls/${infoHashMatch[1].toLowerCase()}/master.m3u8?magnet=${encodeURIComponent(streamUrl)}`;
+        activeStreamUrl = `${backendURL}/api/torrent/hls/${infoHash}/${fileIdx}/master.m3u8?magnet=${encodeURIComponent(streamUrl)}`;
       }
     }
 

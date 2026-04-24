@@ -11,6 +11,8 @@ import express from 'express';
 import helmet from 'helmet';
 import { createServer as createTcpServer } from 'net';
 import { execSync } from 'child_process';
+import fs from 'fs';
+import ffmpegStaticPath from 'ffmpeg-static';
 
 // Config — debe cargarse primero (valida .env y hace process.exit si faltan vars)
 import { config } from './config/env.js';
@@ -158,16 +160,11 @@ async function startServer(isRetry = false) {
       config.cors.allowedOrigins.forEach((o) => console.log(`      • ${o}`));
       console.log('\n    ✅  Servidor listo. Esperando peticiones...\n');
       
-      // Verificar FFmpeg (necesario para transcodificar MKV → MP4)
-      try {
-        execSync('ffmpeg -version', { stdio: 'ignore' });
-        console.log('    🎬  FFmpeg detectado - Transcodificación MKV→MP4 disponible\n');
-      } catch (err) {
-        console.log('    ⚠️  FFmpeg NO detectado - Los torrents MKV/AVI no funcionarán');
-        console.log('    📥  Instala FFmpeg:');
-        console.log('        Windows: https://www.gyan.dev/ffmpeg/builds/ (descarga y agrega a PATH)');
-        console.log('        macOS:   brew install ffmpeg');
-        console.log('        Linux:   sudo apt install ffmpeg\n');
+      // Verificar FFmpeg (usa ffmpeg-static, no requiere instalación en el sistema)
+      if (ffmpegStaticPath && fs.existsSync(ffmpegStaticPath)) {
+        console.log('    🎬  FFmpeg (ffmpeg-static) listo para transcodificar MKV→MP4\n');
+      } else {
+        console.log('    ⚠️   ffmpeg-static no encontrado - instala: npm i ffmpeg-static --prefix backend\n');
       }
     });
     

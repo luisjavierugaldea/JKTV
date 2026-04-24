@@ -9,6 +9,8 @@
  *
  * Al hacer clic en una tarjeta, llama a onSelect(stream).
  */
+import { useEffect } from 'react';
+import { API_BASE_URL } from '../config.js';
 
 // Emoji e info visual por idioma
 const LANG_META = {
@@ -114,7 +116,25 @@ function ServerCard({ stream, isActive, onClick }) {
 }
 
 export default function ServerSelector({ streams, activeStream, onSelect }) {
-  // Agrupar por idioma preservando el orden ya establecido (Latino primero)
+  // 🔥 PRE-CALENTAMIENTO: En cuanto aparecen las opciones, conectar al swarm de cada torrent
+  // silenciosamente. Para cuando el usuario presione Play, ya habrá peers conectados.
+  useEffect(() => {
+    if (!streams?.length) return;
+    const backendURL = API_BASE_URL.replace('/api', '');
+    streams.forEach(stream => {
+      if (stream.type !== 'torrent') return;
+      const magnetUrl = stream.url || stream.directUrl || '';
+      const infoHashMatch = magnetUrl.match(/urn:btih:([a-f0-9]{40})/i);
+      if (!infoHashMatch) return;
+      const infoHash = infoHashMatch[1].toLowerCase();
+      const soMatch = magnetUrl.match(/[?&]so=(\d+)/i);
+      const fileIdx = soMatch ? soMatch[1] : '-1';
+      const warmupUrl = `${backendURL}/api/torrent/warmup/${infoHash}?magnet=${encodeURIComponent(magnetUrl)}&fileIdx=${fileIdx}`;
+      // Fire-and-forget: no esperamos respuesta, solo conectamos al swarm
+      fetch(warmupUrl).catch(() => {});
+    });
+  }, [streams]);
+
   const groups = {};
   const order  = [];
   for (const s of streams) {

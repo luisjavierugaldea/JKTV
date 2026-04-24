@@ -297,19 +297,17 @@ function buildFinalResponse(results, mediaInfo, type, season, episode) {
 
   let finalSelection = [];
 
-  // 4. Extraer el Rey de los Torrents (Solo 1, el mejor)
+  // 4. Extraer el Top de Torrents (Hasta 5 para dar variedad)
   if (torrentStreams.length > 0) {
-    finalSelection.push(torrentStreams[0]);
+    finalSelection = [...finalSelection, ...torrentStreams.slice(0, 5)];
   }
 
-  // 5. Extraer el Top 3 de la Web (Para tener red de seguridad anti-502)
+  // 5. Extraer el Top de la Web (Hasta 10 para ver múltiples servidores de Cuevana, PelisPlus, etc.)
   if (webStreams.length > 0) {
-    // Tomamos hasta 3 servidores. Si hay Filemoon o Streamwish, estarán aquí.
-    const topWeb = webStreams.slice(0, 3);
-    finalSelection = [...finalSelection, ...topWeb];
+    finalSelection = [...finalSelection, ...webStreams.slice(0, 10)];
   }
 
-  console.log(`[Extractor] ✅ Selección Final: 1 Torrent + ${webStreams.slice(0, 3).length} Web`);
+  console.log(`[Extractor] ✅ Selección Final: ${torrentStreams.slice(0, 5).length} Torrents + ${webStreams.slice(0, 10).length} Web`);
 
   return {
     success: true,

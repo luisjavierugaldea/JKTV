@@ -31,8 +31,8 @@ const config = {
   },
   prod: {
     // Backend desplegado en Railway (accesible desde internet)
-    backendURL: 'https://TU-NUEVO-DOMINIO-DE-RAILWAY.up.railway.app/api',
-    description: 'Producción — Backend en Railway',
+    backendURL: 'https://jktv-production.up.railway.app/',
+    description: 'Producción — Backend',
   },
 };
 

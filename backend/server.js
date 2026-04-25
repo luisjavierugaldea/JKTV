@@ -115,6 +115,8 @@ app.use(
   helmet({
     // Permite cargar contenido multimedia de orígenes externos (necesario para streams)
     contentSecurityPolicy: false,
+    // Permite que el frontend lea el stream de audio desde otro origen (ej. localhost:3000 vs 3001)
+    crossOriginResourcePolicy: false,
   })
 );
 

@@ -32,10 +32,9 @@ export function MusicProvider({ children }) {
     setLoadingAudio(true);
     setIsPlaying(false);
     try {
-      const res = await fetch(`${API_BASE_URL}/music/play/${song.id}`);
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      audio.src = data.audioUrl;
+      // Usamos el endpoint /stream/ que actúa como proxy para evitar bloqueos de Google
+      const streamUrl = `${API_BASE_URL}/music/stream/${song.id}`;
+      audio.src = streamUrl;
       audio.volume = volume;
       await audio.play();
       setIsPlaying(true);

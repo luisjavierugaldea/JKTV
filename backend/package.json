@@ -10,6 +10,7 @@
     "install:browsers": "playwright install chromium"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "axios": "^1.7.2",
     "cheerio": "^1.2.0",
     "cors": "^2.8.5",
@@ -27,6 +28,7 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "uuid": "^10.0.0",
     "webtorrent": "^2.8.5",
+    "youtube-dl-exec": "^3.1.5",
     "yt-search": "^2.13.1"
   },
   "devDependencies": {

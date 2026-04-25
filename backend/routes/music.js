@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import ytSearch from 'yt-search';
-import play from 'play-dl';
+import youtubedl from 'youtube-dl-exec';
+import axios from 'axios';
 
 const router = Router();
 
@@ -24,56 +25,65 @@ router.get('/search', async (req, res) => {
 
         console.log(`[Music] ✅ ${songs.length} resultados para "${query}"`);
         res.json({ success: true, songs });
-
     } catch (error) {
         console.error('[Music] ❌ Search error:', error.message);
         res.status(500).json({ success: false, error: 'Error buscando música: ' + error.message });
     }
 });
 
-// 2. Ruta para OBTENER el audio directo
-router.get('/play/:videoId', async (req, res) => {
+// 2. STREAM de audio — extraemos la URL real con yt-dlp y la proxeamos
+router.get('/stream/:videoId', async (req, res) => {
     try {
         const videoId = req.params.videoId;
         if (!videoId) return res.status(400).json({ error: 'videoId requerido' });
 
+        console.log(`[Music] 🎵 Resolviendo stream: ${videoId}`);
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        console.log(`[Music] 🎵 Obteniendo audio para: ${videoId}`);
 
-        const info = await play.video_info(videoUrl);
-        const allFormats = info.format || [];
-        console.log(`[Music] 📦 Formatos disponibles: ${allFormats.length}`);
+        // Obtener metadatos en JSON usando yt-dlp (la herramienta más robusta del mercado)
+        const info = await youtubedl(videoUrl, {
+            dumpJson: true,
+            noWarnings: true,
+            format: 'bestaudio/best', // Pedir explícitamente el mejor audio
+        });
 
-        // Los formatos de audio puro tienen mimeType = "audio/..." y NO tienen qualityLabel
-        const audioOnly = allFormats.filter(f =>
-            f.mimeType && f.mimeType.startsWith('audio/') && f.url
-        );
-
-        // Fallback: formatos combinados video+audio (tienen qualityLabel y bitrate de audio)
-        const combined = allFormats.filter(f =>
-            f.mimeType && f.mimeType.startsWith('video/') && 
-            f.audioQuality && f.url  // audioQuality = "AUDIO_QUALITY_LOW/MEDIUM/HIGH"
-        );
-
-        const candidates = audioOnly.length > 0 ? audioOnly : combined;
-
-        if (!candidates.length) {
-            console.warn(`[Music] ⚠️ Sin formatos de audio para: ${videoId}`);
-            return res.status(404).json({ success: false, error: 'No se encontró audio para este video.' });
+        if (!info || !info.url) {
+            return res.status(404).json({ success: false, error: 'No se encontró audio.' });
         }
 
-        // Para audio puro: ordenar por bitrate mayor primero
-        // Para combinados: los 360p suelen tener mejor compatibilidad
-        const best = audioOnly.length > 0
-            ? candidates.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0]
-            : candidates.find(f => f.qualityLabel === '360p') || candidates[0];
+        console.log(`[Music] ✅ URL extraída. Iniciando proxy...`);
 
-        console.log(`[Music] ✅ Audio listo — bitrate: ${best.audioBitrate || '?'}kbps, tipo: ${best.mimeType || '?'}`);
-        res.json({ success: true, audioUrl: best.url, bitrate: best.audioBitrate, mime: best.mimeType });
+        const rangeHeader = req.headers['range'];
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
+            'Referer': 'https://www.youtube.com/',
+        };
+        if (rangeHeader) headers['Range'] = rangeHeader;
+
+        // Proxeamos el stream a través de nuestro backend
+        const upstreamRes = await axios.get(info.url, {
+            headers,
+            responseType: 'stream',
+            timeout: 30000,
+        });
+
+        res.setHeader('Content-Type', upstreamRes.headers['content-type'] || 'audio/webm');
+        if (upstreamRes.headers['content-length']) res.setHeader('Content-Length', upstreamRes.headers['content-length']);
+        if (upstreamRes.headers['content-range']) res.setHeader('Content-Range', upstreamRes.headers['content-range']);
+        if (upstreamRes.headers['accept-ranges']) res.setHeader('Accept-Ranges', upstreamRes.headers['accept-ranges']);
+
+        res.status(upstreamRes.status);
+        upstreamRes.data.pipe(res);
+
+        upstreamRes.data.on('error', (err) => {
+            console.error(`[Music] ❌ Stream error: ${err.message}`);
+        });
 
     } catch (error) {
-        console.error('[Music] ❌ Play error:', error.message);
-        res.status(500).json({ success: false, error: 'Error extrayendo audio: ' + error.message });
+        console.error('[Music] ❌ Error en el stream:', error.message);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, error: 'Error procesando audio: ' + error.message });
+        }
     }
 });
 

@@ -4,7 +4,7 @@
  * Stack: Node.js + Express
  * Ejecutar en desarrollo: npm run dev
  * Ejecutar en producción: npm start
- * Última actualización: 2026-04-22 - Rutas de anime + películas/series activas
+ * Última actualización: 2026-04-25 - Fix de compatibilidad Windows/Linux (Railway)
  */
 
 import express from 'express';
@@ -42,7 +42,7 @@ import musicRouter from './routes/music.js';
 // Browser pool (para cierre limpio en shutdown)
 import { closeBrowser } from './scrapers/browserPool.js';
 
-// ─── Liberar puerto si está ocupado ──────────────────────────────────────────
+// ─── Liberar puerto si está ocupado (Solo para Windows/Desarrollo) ────────────
 function freePort(port, maxRetries = 3) {
   return new Promise((resolve, reject) => {
     let attempts = 0;
@@ -50,17 +50,17 @@ function freePort(port, maxRetries = 3) {
     const checkPort = () => {
       attempts++;
       const tester = createTcpServer();
-      
+
       tester.once('error', async () => {
         tester.close();
-        
+
         if (attempts >= maxRetries) {
           console.error(`❌  No se pudo liberar el puerto ${port} después de ${maxRetries} intentos.`);
           return reject(new Error(`Puerto ${port} ocupado después de ${maxRetries} intentos`));
         }
 
         console.log(`⚠️  Puerto ${port} en uso. Intentando liberar (intento ${attempts}/${maxRetries})...`);
-        
+
         try {
           const out = execSync(`netstat -ano | findstr ":${port} "`, { encoding: 'utf8' });
           const pids = [...new Set(
@@ -69,7 +69,7 @@ function freePort(port, maxRetries = 3) {
               .map((l) => l.trim().split(/\s+/).at(-1))
               .filter(Boolean)
           )];
-          
+
           if (pids.length === 0) {
             console.log(`⏳  Esperando que el SO libere el puerto ${port}...`);
           } else {
@@ -85,11 +85,11 @@ function freePort(port, maxRetries = 3) {
         } catch (err) {
           // netstat sin resultados o error
         }
-        
+
         // Esperar más tiempo para que el SO libere el puerto
         setTimeout(checkPort, 1000);
       });
-      
+
       tester.once('listening', () => {
         tester.close();
         if (attempts > 1) {
@@ -97,7 +97,7 @@ function freePort(port, maxRetries = 3) {
         }
         resolve();
       });
-      
+
       tester.listen(port, '0.0.0.0');
     };
 
@@ -115,7 +115,7 @@ app.use(
   helmet({
     // Permite cargar contenido multimedia de orígenes externos (necesario para streams)
     contentSecurityPolicy: false,
-    // Permite que el frontend lea el stream de audio desde otro origen (ej. localhost:3000 vs 3001)
+    // Permite que el frontend lea el stream de audio desde otro origen
     crossOriginResourcePolicy: false,
   })
 );
@@ -159,35 +159,39 @@ app.use(errorHandler);
 
 // ─── Arranque del Servidor ────────────────────────────────────────────────────
 async function startServer(isRetry = false) {
+  // 🌟 VARIABLE DE ENTORNO SEGURA: Detecta si estamos en Railway (Producción)
+  const isProd = config.nodeEnv === 'production' || process.env.NODE_ENV === 'production';
+
   try {
-    await freePort(config.port);
-    
+    // 🛡️ FIX NUBE: Solo liberamos el puerto si estamos en nuestra PC con Windows
+    if (!isProd) {
+      await freePort(config.port);
+    }
+
     // Crear servidor HTTP con límite de URI ampliado (fix para streams con URLs muy largas)
     const server = http.createServer({ maxHeaderSize: 262144 }, app);
+
     server.listen(config.port, () => {
-      console.log(`\n🎬  Stremio Clone Backend`);
-      console.log(`    Entorno    : ${config.nodeEnv}`);
+      console.log(`\n🎬  JKTV Backend`);
+      console.log(`    Entorno    : ${isProd ? '☁️ Producción (Nube)' : '💻 Desarrollo (Local)'}`);
       console.log(`    Puerto     : ${config.port}`);
       console.log(`    Health     : http://localhost:${config.port}/api/health`);
-      console.log(`    TMDB Proxy : http://localhost:${config.port}/api/tmdb/trending`);
-      console.log(`    Stream     : http://localhost:${config.port}/api/stream?title=Inception&year=2010`);
-      console.log(`\n    Origenes CORS permitidos:`);
-      config.cors.allowedOrigins.forEach((o) => console.log(`      • ${o}`));
-      console.log('\n    ✅  Servidor listo. Esperando peticiones...\n');
-      
-      // Verificar FFmpeg (usa ffmpeg-static, no requiere instalación en el sistema)
+      console.log(`\n    ✅  Servidor listo. Esperando peticiones...\n`);
+
+      // Verificar FFmpeg (usa ffmpeg-static, no requiere instalación manual en la PC)
       if (ffmpegStaticPath && fs.existsSync(ffmpegStaticPath)) {
-        console.log('    🎬  FFmpeg (ffmpeg-static) listo para transcodificar MKV→MP4\n');
+        console.log('    🎬  FFmpeg (ffmpeg-static) listo para transcodificar\n');
       } else {
-        console.log('    ⚠️   ffmpeg-static no encontrado - instala: npm i ffmpeg-static --prefix backend\n');
+        console.log('    ⚠️   ffmpeg-static no encontrado\n');
       }
     });
-    
+
     server.on('error', async (err) => {
       if (err.code === 'EADDRINUSE') {
         console.error(`\n❌  Error: El puerto ${config.port} ya está en uso.`);
-        
-        if (!isRetry) {
+
+        // 🛡️ FIX NUBE: Solo ejecutamos comandos de Windows (taskkill) si estamos en local
+        if (!isRetry && !isProd) {
           console.log(`🔄  Ejecutando: taskkill /F /IM node.exe`);
           try {
             execSync('taskkill /F /IM node.exe', { stdio: 'ignore' });
@@ -198,32 +202,25 @@ async function startServer(isRetry = false) {
           } catch (killErr) {
             console.error(`⚠️  Error al ejecutar taskkill:`, killErr.message);
           }
+        } else if (isProd) {
+          console.error(`\n❌  Error Crítico en la Nube: Puerto bloqueado. Revisar logs de Railway.`);
+          process.exit(1);
         }
-        
+
         console.error(`\n❌  No se pudo liberar el puerto después del reintento.`);
-        console.error(`    Ejecuta manualmente: taskkill /F /IM node.exe\n`);
         process.exit(1);
       } else {
         console.error(`\n❌  Error al iniciar el servidor:`, err);
         process.exit(1);
       }
     });
-    
-    // Manejo de señales para cierre limpio
-    const shutdown = async (signal) => {
-      console.log(`\n⚠️  Señal ${signal} recibida. Cerrando servidor...`);
-      await closeBrowser();
-      server.close(() => {
-        console.log('✅  Servidor cerrado correctamente.');
-        process.exit(0);
-      });
-    };
-    
-    process.on('SIGINT', () => shutdown('SIGINT'));
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    
+
+    // Guardamos la referencia del servidor globalmente para apagarlo limpio luego
+    global.jktvServer = server;
+
   } catch (err) {
-    if (!isRetry) {
+    // 🛡️ FIX NUBE: Mismo escudo protector para el bloque catch
+    if (!isRetry && !isProd) {
       console.error(`\n❌  Error al liberar el puerto ${config.port}:`, err.message);
       console.log(`🔄  Ejecutando: taskkill /F /IM node.exe`);
       try {
@@ -235,22 +232,35 @@ async function startServer(isRetry = false) {
       } catch (killErr) {
         console.error(`⚠️  Error al ejecutar taskkill:`, killErr.message);
       }
+    } else if (isProd) {
+      console.error(`\n❌  Error Crítico en la Nube:`, err.message);
+      process.exit(1);
     }
-    
-    console.error(`\n❌  No se pudo iniciar el servidor después del reintento.`);
-    console.error(`    Ejecuta manualmente: netstat -ano | findstr ":${config.port}"\n`);
+
+    console.error(`\n❌  No se pudo iniciar el servidor.`);
     process.exit(1);
   }
 }
 
 startServer();
 
-// Manejo elegante de cierre (SIGTERM / SIGINT)
+// ─── Manejo elegante de cierre (SIGTERM / SIGINT) ─────────────────────────────
+// (Movido aquí para no duplicarse y cerrar los scrapers limpiamente)
 async function shutdown(signal) {
   console.log(`\n🛑  Señal ${signal} recibida. Apagando servidor...`);
-  await closeBrowser(); // Cerrar instancia de Chromium
-  console.log('👋  Servidor apagado limpiamente.\n');
-  process.exit(0);
+
+  // 1. Matamos los navegadores ocultos de Playwright
+  await closeBrowser();
+
+  // 2. Cerramos el servidor HTTP
+  if (global.jktvServer) {
+    global.jktvServer.close(() => {
+      console.log('👋  Servidor apagado limpiamente.\n');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));

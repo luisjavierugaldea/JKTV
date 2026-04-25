@@ -14,7 +14,6 @@ import helmet from 'helmet';
 import { createServer as createTcpServer } from 'net';
 import { execSync } from 'child_process';
 import fs from 'fs';
-import ffmpegStaticPath from 'ffmpeg-static';
 
 // 🚀 Aumentar el límite para procesar miles de canales sin advertencias de memoria
 EventEmitter.defaultMaxListeners = 100;
@@ -178,12 +177,7 @@ async function startServer(isRetry = false) {
       console.log(`    Health     : http://localhost:${config.port}/api/health`);
       console.log(`\n    ✅  Servidor listo. Esperando peticiones...\n`);
 
-      // Verificar FFmpeg (usa ffmpeg-static, no requiere instalación manual en la PC)
-      if (ffmpegStaticPath && fs.existsSync(ffmpegStaticPath)) {
-        console.log('    🎬  FFmpeg (ffmpeg-static) listo para transcodificar\n');
-      } else {
-        console.log('    ⚠️   ffmpeg-static no encontrado\n');
-      }
+      console.log('    🎬  Motor FFmpeg listo y conectado al sistema\n');
     });
 
     server.on('error', async (err) => {

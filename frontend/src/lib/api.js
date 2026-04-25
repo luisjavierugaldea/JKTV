@@ -7,14 +7,9 @@ import axios from 'axios';
 import { Capacitor } from '@capacitor/core';
 import { API_BASE_URL } from '../config.js';
 
-// Detectar si es Android/iOS (APK) o Web
+// Eliminamos la validación condicional porque config.js ya hace todo el trabajo
 const getBaseURL = () => {
-  if (Capacitor.isNativePlatform()) {
-    // APK: Usa la URL configurada en config.js (dev o prod)
-    return API_BASE_URL;
-  }
-  // Web: Usa proxy de Vite (desarrollo local)
-  return '/api';
+  return API_BASE_URL;
 };
 
 const api = axios.create({
@@ -26,18 +21,18 @@ export default api;
 
 // ── TMDB ──────────────────────────────────────────────────────────────────────
 export const tmdb = {
-  trending:  (type = 'movie', window = 'week', page = 1) =>
+  trending: (type = 'movie', window = 'week', page = 1) =>
     api.get(`/tmdb/trending?type=${type}&window=${window}&page=${page}`),
 
   search: (query, type = 'movie', page = 1) =>
     api.get(`/tmdb/search?query=${encodeURIComponent(query)}&type=${type}&page=${page}`),
 
   movieDetail: (id) => api.get(`/tmdb/movie/${id}`),
-  tvDetail:    (id) => api.get(`/tmdb/tv/${id}`),
+  tvDetail: (id) => api.get(`/tmdb/tv/${id}`),
 
   discover: (type = 'movie', genre = '', page = 1, country = '') => {
     const params = new URLSearchParams({ type, page });
-    if (genre)   params.set('genre', genre);
+    if (genre) params.set('genre', genre);
     if (country) params.set('country', country);
     return api.get(`/tmdb/discover?${params}`);
   },

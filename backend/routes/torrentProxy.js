@@ -2,20 +2,16 @@
  * routes/torrentProxy.js
  * Proxy para convertir magnet links a HTTP streaming
  * WebTorrent solo funciona en Node.js, no en navegadores modernos
- * Con transcodificación FFmpeg (ffmpeg-static) para MKV → MP4/HLS
+ * Con transcodificación FFmpeg (Nativo) para MKV → MP4/HLS
  */
 import express from 'express';
 import WebTorrent from 'webtorrent';
 import pump from 'pump';
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegPath from 'ffmpeg-static';
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-
-// Asignar el binario de FFmpeg a fluent-ffmpeg
-ffmpeg.setFfmpegPath(ffmpegPath);
 
 const router = express.Router();
 
@@ -63,7 +59,7 @@ if (!fs.existsSync(HLS_DIR)) fs.mkdirSync(HLS_DIR, { recursive: true });
 
 /**
  * GET /api/torrent/hls/:infoHash/:file
- * * Genera y sirve HLS al vuelo usando FFmpeg para soportar pistas de audio y buffer inteligente
+ * Genera y sirve HLS al vuelo usando FFmpeg para soportar pistas de audio y buffer inteligente
  */
 router.get('/hls/:infoHash/:param1/:param2?', async (req, res) => {
   const { infoHash, param1, param2 } = req.params;
@@ -205,7 +201,7 @@ router.get('/hls/:infoHash/:param1/:param2?', async (req, res) => {
         const videoFiles = torrent.files
           .filter(f => /\.(mp4|mkv|avi|webm|mov)$/i.test(f.name))
           .sort((a, b) => b.length - a.length);
-        
+
         videoFile = videoFiles[0]; // El más grande siempre
         console.log(`[HLS] 🔍 Auto-detectando archivo más grande: ${videoFile?.name} (${(videoFile?.length / 1024 / 1024).toFixed(2)} MB)`);
       }
@@ -551,7 +547,6 @@ router.get('/stream', async (req, res) => {
 });
 
 router.get('/info', async (req, res) => {
-  // ... (Tu código actual de /info se mantiene igual)
   const { magnet } = req.query;
   if (!magnet || !magnet.startsWith('magnet:')) return res.status(400).json({ error: 'Magnet link inválido' });
   try {

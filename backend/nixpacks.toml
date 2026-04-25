@@ -1,4 +1,13 @@
 providers = ["node"]
 
 [phases.setup]
-nixPkgs = ["nodejs", "ffmpeg"]
+# Instalamos FFmpeg y las librerías necesarias para que Chromium/Playwright no explote
+aptPkgs = [
+    "ffmpeg",
+    "libnss3",
+    "libxss1",
+    "libasound2",
+    "libatk-bridge2.0-0",
+    "libgtk-3-0",
+    "libgbm-dev"
+]

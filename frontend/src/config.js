@@ -10,7 +10,7 @@
  */
 
 // 🎯 CAMBIA AQUÍ ANTES DE COMPILAR
-const MODE = 'dev';
+const MODE = 'prod';
 
 // IP de tu PC en la red WiFi (solo necesaria para MODE='apk')
 // Mírala con: ipconfig → Adaptador WiFi → Dirección IPv4
@@ -30,9 +30,9 @@ const config = {
     description: `APK Local — Backend en ${PC_IP}`,
   },
   prod: {
-    // Backend desplegado en Render.com (accesible desde internet)
-    backendURL: 'https://jktv-backend.onrender.com/api',
-    description: 'Producción — Backend en Render',
+    // Backend desplegado en Railway (accesible desde internet)
+    backendURL: 'https://TU-NUEVO-DOMINIO-DE-RAILWAY.up.railway.app/api',
+    description: 'Producción — Backend en Railway',
   },
 };
 

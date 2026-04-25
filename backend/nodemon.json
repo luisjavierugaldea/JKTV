@@ -1,0 +1,8 @@
+{
+  "ignore": [
+    "iptv_cache.json",
+    "iptv_blacklist.json",
+    "*.test.js",
+    "*.spec.js"
+  ]
+}

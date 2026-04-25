@@ -1,7 +1,8 @@
 /**
  * config/cors.js
  * Configuración de CORS para Express.
- * Permite el origen del frontend en desarrollo y producción.
+ * En desarrollo: acepta cualquier origen (cómodo para celular/tablet/APK).
+ * En producción: solo acepta orígenes de la lista de .env
  */
 
 import cors from 'cors';
@@ -9,14 +10,24 @@ import { config } from './env.js';
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Permitir peticiones sin Origin (Postman, curl, apps nativas)
-    if (!origin) return callback(null, true);
-
-    // Permitir Capacitor (apps Android/iOS) y el APK en modo HTTP local
-    if (origin.startsWith('capacitor://') || origin.startsWith('ionic://') || origin === 'http://localhost') {
+    // En desarrollo, aceptar TODO. Es seguro porque el backend no está expuesto en internet.
+    if (config.isDev) {
       return callback(null, true);
     }
 
+    // Permitir peticiones sin Origin (Postman, curl, apps nativas, Capacitor)
+    if (!origin) return callback(null, true);
+
+    // Permitir Capacitor (apps Android/iOS)
+    if (
+      origin.startsWith('capacitor://') ||
+      origin.startsWith('ionic://') ||
+      origin === 'http://localhost'
+    ) {
+      return callback(null, true);
+    }
+
+    // En producción: verificar lista de orígenes permitidos
     if (config.cors.allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {

@@ -306,6 +306,13 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
                 streamUrl={selectedStream.url}
                 streamType={selectedStream.type}
                 title={title}
+                meta={{
+                  id: movie.id,
+                  type: type,
+                  season: season,
+                  episode: episode
+                }}
+                onNextEpisode={type === 'tv' ? handleNextEpisode : null}
               />
 
               {/* Navegación de episodios (solo para series) */}

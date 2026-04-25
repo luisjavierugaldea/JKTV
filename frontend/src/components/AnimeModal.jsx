@@ -142,6 +142,15 @@ export default function AnimeModal({ anime, onClose }) {
     }
   }
 
+  function handleNextEpisode() {
+    if (animeInfo?.episodes && selectedEpisode) {
+      const nextEp = animeInfo.episodes.find(ep => ep.number === selectedEpisode.number + 1);
+      if (nextEp) {
+        handleEpisodeSelect(nextEp);
+      }
+    }
+  }
+
   const displayInfo = animeInfo || anime;
   const description = displayInfo.description || displayInfo.overview || 'Descripción no disponible';
   const genres = displayInfo.genres || [];
@@ -357,6 +366,17 @@ export default function AnimeModal({ anime, onClose }) {
                 streamUrl={selectedStream.url}
                 streamType={selectedStream.type}
                 title={`${title} - Episodio ${selectedEpisode.number}`}
+                meta={{
+                  id: anime.id || anime.url,
+                  type: 'anime',
+                  season: 1,
+                  episode: selectedEpisode.number
+                }}
+                onNextEpisode={
+                  animeInfo?.episodes?.some(ep => ep.number === selectedEpisode.number + 1)
+                    ? handleNextEpisode
+                    : null
+                }
               />
 
               {/* Título del episodio */}

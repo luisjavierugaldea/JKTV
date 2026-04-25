@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
+import mpegts from 'mpegts.js';
 import { API_BASE_URL } from '../config.js';
 import { Capacitor } from '@capacitor/core';
 
@@ -109,7 +110,7 @@ function MenuOption({ label, isActive, onClick, extra }) {
 }
 
 // ── VideoPlayer Principal ─────────────────────────────────────────────────────
-export default function VideoPlayer({ streamUrl, streamType, title }) {
+export default function VideoPlayer({ streamUrl, streamUrls, streamType, title, poster, onFatalError, onNoSignal, meta, onNextEpisode }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const containerRef = useRef(null);
@@ -119,6 +120,8 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
   const [error, setError] = useState(null);
   const [nativeUrl, setNativeUrl] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [urlIndex, setUrlIndex] = useState(0);
+  const [errorCount, setErrorCount] = useState(0);
   
   // Estados de Reproductor
   const [isPlaying, setIsPlaying] = useState(false);
@@ -131,6 +134,7 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
   // Estados de Interfaz
   const [showControls, setShowControls] = useState(true);
   const [activeMenu, setActiveMenu] = useState(null); // 'settings', 'quality', 'audio'
+  const [showNextEpisodePrompt, setShowNextEpisodePrompt] = useState(false);
   
   // Estados HLS
   const [levels, setLevels] = useState([]);
@@ -237,7 +241,8 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
 
   // ── Inicialización ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!streamUrl || !videoRef.current) return;
+    const currentStreamUrl = (streamUrls && streamUrls.length > 0) ? streamUrls[urlIndex] : streamUrl;
+    if (!currentStreamUrl || !videoRef.current) return;
     const video = videoRef.current;
     
     setError(null);
@@ -251,15 +256,17 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
     setIsPlaying(false);
 
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
+    if (window.tsPlayer) { window.tsPlayer.destroy(); window.tsPlayer = null; }
 
-    const isTorrentOrMkv = streamType === 'torrent' || streamUrl.toLowerCase().includes('.mkv');
+    const isTorrentOrMkv = streamType === 'torrent' || currentStreamUrl.toLowerCase().includes('.mkv');
+    const isTS = currentStreamUrl.toLowerCase().includes('.ts') || currentStreamUrl.includes('output=ts') || currentStreamUrl.includes('/live/');
 
     // MODO NATIVO: Guardamos el Intent para el botón "Externo", pero forzamos HLS para reproducción interna.
     if (Capacitor.isNativePlatform() && isTorrentOrMkv) {
-      let finalUrl = streamUrl;
+      let finalUrl = currentStreamUrl;
       if (streamType === 'torrent') {
         const backendURL = API_BASE_URL.replace('/api', '');
-        finalUrl = `${backendURL}/api/torrent/stream?magnet=${encodeURIComponent(streamUrl)}&raw=true`;
+        finalUrl = `${backendURL}/api/torrent/stream?magnet=${encodeURIComponent(currentStreamUrl)}&raw=true`;
       }
       const urlWithoutScheme = finalUrl.replace(/^https?:\/\//i, '');
       const scheme = finalUrl.startsWith('https') ? 'https' : 'http';
@@ -271,19 +278,23 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
 
     // Preparar URL para HLS Interno
     let activeStreamType = streamType;
-    let activeStreamUrl = streamUrl;
+    let activeStreamUrl = currentStreamUrl;
 
     if (streamType === 'torrent') {
       const backendURL = API_BASE_URL.replace('/api', '');
-      const infoHashMatch = streamUrl.match(/urn:btih:([a-f0-9]{40})/i);
+      const infoHashMatch = currentStreamUrl.match(/urn:btih:([a-f0-9]{40})/i);
       if (infoHashMatch) {
         const infoHash = infoHashMatch[1].toLowerCase();
         const soMatch = streamUrl.match(/[?&]so=(\d+)/i);
         const fileIdx = soMatch ? soMatch[1] : '0';
         
         activeStreamType = 'hls';
-        activeStreamUrl = `${backendURL}/api/torrent/hls/${infoHash}/${fileIdx}/master.m3u8?magnet=${encodeURIComponent(streamUrl)}`;
+        activeStreamUrl = `${backendURL}/api/torrent/hls/${infoHash}/${fileIdx}/master.m3u8?magnet=${encodeURIComponent(currentStreamUrl)}`;
       }
+    } else if (streamType === 'embed') {
+      const backendURL = API_BASE_URL.replace('/api', '');
+      // Pasamos el URL por el proxy de iframe para evadir X-Frame-Options
+      activeStreamUrl = `${backendURL}/api/proxy-stream/iframe?url=${encodeURIComponent(currentStreamUrl)}`;
     }
 
     if (activeStreamType === 'hls' && Hls.isSupported()) {
@@ -319,13 +330,82 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
 
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            // Detectar si es un error de "sin señal ahora" (PPV/evento no activo)
+            const httpStatus = data.response?.code;
+            const isNoSignal = httpStatus === 403 || httpStatus === 503 || httpStatus === 502;
+
+            if (streamUrls && streamUrls.length > 0 && urlIndex < streamUrls.length - 1) {
+              // Todavía hay fuentes alternativas, intentamos con la siguiente
+              hls.destroy();
+              setUrlIndex(urlIndex + 1);
+            } else if (isNoSignal) {
+              // Todas las fuentes fallaron, pero es un bloqueo temporal (PPV sin evento)
+              // NO auto-saltamos, NO borramos de la lista — solo mostramos mensaje de espera
+              console.log('[VideoPlayer] 📡 Sin señal ahora (PPV/evento no activo). Canal conservado en lista.');
+              if (onNoSignal) onNoSignal();
+              setError('📡 Sin señal en este momento. Este canal puede ser un evento PPV.\n\nVuelve a intentarlo cuando comience el evento.');
+              setLoading(false);
+            } else {
+              // Error de red real (404) → canal muerto → auto-skip
+              if (onFatalError) onFatalError();
+              hls.startLoad();
+            }
+          }
           else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-          else { setError(`Error de reproducción: ${data.details}`); setLoading(false); }
+          else { 
+            if (onFatalError) onFatalError();
+            setError(`Error de reproducción: ${data.details}`); 
+            setLoading(false); 
+          }
+        } else {
+          // Errores de fragmentos repetidos
+          if (data.details === 'fragLoadError') {
+            const httpStatus = data.response?.code;
+            const isNoSignal = httpStatus === 403 || httpStatus === 503 || httpStatus === 502;
+            setErrorCount(prev => {
+              const newCount = prev + 1;
+              if (newCount >= 3) {
+                if (isNoSignal) {
+                  console.log('[VideoPlayer] 📡 Sin señal (PPV). Conservando canal en lista.');
+                  if (onNoSignal) onNoSignal();
+                  setError('📡 Sin señal ahora. Vuelve cuando comience el evento.');
+                  setLoading(false);
+                } else {
+                  console.log('[VideoPlayer] Demasiados errores. Canal muerto, saltando...');
+                  if (onFatalError) onFatalError();
+                }
+              }
+              return newCount;
+            });
+          }
         }
       });
 
       hlsRef.current = hls;
+
+    } else if (isTS && mpegts.isSupported()) {
+      // MODO IPTV DIRECTO (TS - Similar a 9xtream)
+      const player = mpegts.createPlayer({
+        type: 'mse',
+        isLive: true,
+        url: activeStreamUrl,
+        cors: true
+      });
+      player.attachMediaElement(video);
+      player.load();
+      player.play().catch(() => { });
+      
+      player.on(mpegts.Events.ERROR, (type, detail) => {
+          console.error('[TS Player] Error:', type, detail);
+          if (streamUrls && urlIndex < streamUrls.length - 1) {
+              player.destroy();
+              setUrlIndex(urlIndex + 1);
+          }
+      });
+
+      window.tsPlayer = player;
+      setLoading(false);
 
     } else if (streamType === 'hls' && video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = streamUrl;
@@ -341,8 +421,9 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
 
     return () => {
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
+      if (window.tsPlayer) { window.tsPlayer.destroy(); window.tsPlayer = null; }
     };
-  }, [streamUrl, streamType]);
+  }, [streamUrl, streamUrls, urlIndex, streamType]);
 
   const displayIdx = activeLevel >= 0 ? activeLevel : realLevel;
   const qualityLabel = levels[displayIdx]?.height ? `${levels[displayIdx].height}p` : 'Auto';
@@ -535,6 +616,7 @@ export default function VideoPlayer({ streamUrl, streamType, title }) {
         ref={videoRef} 
         preload="auto" 
         playsInline 
+        poster={poster}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}

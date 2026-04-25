@@ -91,3 +91,8 @@ export const anime = {
     return api.get(`/anime/episode?${params}`);
   },
 };
+
+// ── IPTV (TV en Vivo) ─────────────────────────────────────────────────────────
+export const iptv = {
+  getChannels: () => api.get('/iptv/channels'),
+};

@@ -8,11 +8,16 @@
  */
 
 import express from 'express';
+import http from 'http';
+import { EventEmitter } from 'events';
 import helmet from 'helmet';
 import { createServer as createTcpServer } from 'net';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import ffmpegStaticPath from 'ffmpeg-static';
+
+// 🚀 Aumentar el límite para procesar miles de canales sin advertencias de memoria
+EventEmitter.defaultMaxListeners = 100;
 
 // Config — debe cargarse primero (valida .env y hace process.exit si faltan vars)
 import { config } from './config/env.js';
@@ -30,6 +35,9 @@ import streamRouter from './routes/stream.js';
 import proxyStreamRouter from './routes/proxyStream.js';
 import animeRouter from './routes/anime.js';
 import torrentProxyRouter from './routes/torrentProxy.js';
+import iptvRouter from './routes/iptv.js';
+import iptvProxyRouter from './routes/iptvProxy.js';
+import musicRouter from './routes/music.js';
 
 // Browser pool (para cierre limpio en shutdown)
 import { closeBrowser } from './scrapers/browserPool.js';
@@ -130,6 +138,9 @@ app.use('/api/stream', streamRouter);
 app.use('/api/proxy-stream', proxyStreamRouter);
 app.use('/api/anime', animeRouter);
 app.use('/api/torrent', torrentProxyRouter);
+app.use('/api/iptv', iptvRouter);
+app.use('/api/iptv-proxy', iptvProxyRouter);
+app.use('/api/music', musicRouter);
 
 // Ruta de fallback para endpoints no existentes
 app.use((_req, res) => {
@@ -149,7 +160,9 @@ async function startServer(isRetry = false) {
   try {
     await freePort(config.port);
     
-    const server = app.listen(config.port, () => {
+    // Crear servidor HTTP con límite de URI ampliado (fix para streams con URLs muy largas)
+    const server = http.createServer({ maxHeaderSize: 262144 }, app);
+    server.listen(config.port, () => {
       console.log(`\n🎬  Stremio Clone Backend`);
       console.log(`    Entorno    : ${config.nodeEnv}`);
       console.log(`    Puerto     : ${config.port}`);

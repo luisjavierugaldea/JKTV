@@ -185,5 +185,47 @@ router.get('/segment', async (req, res) => {
   }
 });
 
+// ── GET /api/proxy-stream/iframe ──────────────────────────────────────────────
+// Proxy para incrustar iframes (Cuevana, PelisPlus) evadiendo X-Frame-Options
+router.get('/iframe', async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).send('url requerida');
+
+  try {
+    const parsedUrl = new URL(url);
+    const origin = parsedUrl.origin;
+
+    const { data, headers } = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Referer': origin,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      },
+      responseType: 'text',
+      timeout: 15_000,
+    });
+
+    // Remover cabeceras de seguridad que bloquean el iframe
+    const safeHeaders = { ...headers };
+    delete safeHeaders['x-frame-options'];
+    delete safeHeaders['content-security-policy'];
+    delete safeHeaders['set-cookie'];
+
+    // Inyectar etiqueta <base> para que las rutas relativas (/js/player.js) funcionen
+    const modifiedHtml = data.replace(
+      /<head>/i,
+      `<head>\n<base href="${origin}/">`
+    );
+
+    res.set(safeHeaders);
+    res.set('Access-Control-Allow-Origin', '*');
+    res.send(modifiedHtml);
+
+  } catch (err) {
+    console.error(`[ProxyStream] Iframe error: ${err.message}`);
+    res.status(502).send('No se pudo cargar el reproductor.');
+  }
+});
+
 export default router;
 export { enc };

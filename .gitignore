@@ -64,3 +64,15 @@ test-results/
 tmp/
 temp/
 *.tmp
+
+# Carpetas personales / archivos grandes que NO deben subirse a Git
+frontend/Descargas/
+frontend/android/node_modules/
+*.exe
+*.apk
+*.aab
+*.mp3
+*.mp4
+*.avi
+*.mkv
+*.iso

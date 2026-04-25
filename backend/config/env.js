@@ -5,6 +5,7 @@
  */
 
 import 'dotenv/config';
+import os from 'os';
 
 const required = ['TMDB_API_KEY'];
 
@@ -32,9 +33,27 @@ export const config = {
   },
 
   cors: {
-    allowedOrigins: (process.env.ALLOWED_ORIGINS ?? 'http://localhost:5173')
-      .split(',')
-      .map((o) => o.trim()),
+    allowedOrigins: (() => {
+      // Orígenes base
+      const base = (process.env.ALLOWED_ORIGINS ?? 'http://localhost:5173,http://localhost:3000')
+        .split(',')
+        .map((o) => o.trim());
+
+      // Auto-detectar IPs de red locales y añadirlas (para celular/tablet en el mismo WiFi)
+      const ifaces = os.networkInterfaces();
+      for (const iface of Object.values(ifaces)) {
+        for (const details of iface) {
+          if (details.family === 'IPv4' && !details.internal) {
+            const ip = details.address;
+            base.push(`http://${ip}:3000`);
+            base.push(`http://${ip}:5173`);
+            base.push(`http://${ip}`);
+            console.log(`[CORS] ✅ IP local detectada: ${ip} — añadida a orígenes permitidos`);
+          }
+        }
+      }
+      return base;
+    })(),
   },
 
   scraper: {

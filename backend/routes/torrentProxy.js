@@ -117,7 +117,7 @@ router.get('/hls/:infoHash/:param1/:param2?', async (req, res) => {
             // Limpiar si ya fue agregado pero sin metadata aún
             const existingTorrent = client.get(infoHash);
             if (existingTorrent && !activeTorrents.has(infoHash)) {
-              existingTorrent.destroy();
+              client.remove(infoHash, { destroyStore: true });
             }
             console.error(`[HLS] ⏱️ Timeout 90s para torrent ${infoHash} — Swarm sin peers suficientes.`);
             reject(new Error('Timeout: sin peers en 90 segundos'));
@@ -201,14 +201,19 @@ router.get('/hls/:infoHash/:param1/:param2?', async (req, res) => {
         videoFile = torrent.files[fileIdx];
         console.log(`[HLS] 🎯 Usando archivo por índice &so=${fileIdx}: ${videoFile.name}`);
       } else {
+        // Encontrar el archivo de video MÁS GRANDE (Evitar agarrar trailers o samples)
         const videoFiles = torrent.files
           .filter(f => /\.(mp4|mkv|avi|webm|mov)$/i.test(f.name))
           .sort((a, b) => b.length - a.length);
-        videoFile = videoFiles.find(f => f.name.endsWith('.mp4')) || videoFiles[0];
-        console.log(`[HLS] 🔍 Auto-detectando archivo más grande: ${videoFile?.name}`);
+        
+        videoFile = videoFiles[0]; // El más grande siempre
+        console.log(`[HLS] 🔍 Auto-detectando archivo más grande: ${videoFile?.name} (${(videoFile?.length / 1024 / 1024).toFixed(2)} MB)`);
       }
 
-      if (!videoFile) return res.status(404).json({ error: 'No video file in torrent' });
+      if (!videoFile) {
+        console.error(`[HLS 404] No se encontró video en el torrent ${infoHash}. fileIdx: ${fileIdx}`);
+        return res.status(404).json({ error: 'No video file in torrent' });
+      }
 
       if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
 
@@ -233,6 +238,8 @@ router.get('/hls/:infoHash/:param1/:param2?', async (req, res) => {
             '-crf 28',
             '-map 0:v:0',
             '-map 0:a?',
+            '-pix_fmt yuv420p',        // 👈 Asegura compatibilidad de video en todos los navegadores
+            '-ac 2',                   // 👈 Forzar audio estéreo (evita cuelgues con 5.1/7.1)
             '-f hls',
             '-hls_time 2',             // Segmentos de 2s (antes 6s) = primer segmento 3x más rápido
             '-hls_init_time 1',        // Primer segmento en 1s
@@ -321,8 +328,14 @@ router.get('/hls/:infoHash/:param1/:param2?', async (req, res) => {
   // --- SERVIR FRAGMENTOS (.ts) u otros archivos ---
   if (fs.existsSync(filePath)) {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    if (file === 'master.m3u8') {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
     res.sendFile(filePath);
   } else {
+    console.error(`[HLS 404] Archivo no encontrado: ${filePath} (URL: ${req.originalUrl})`);
     res.status(404).end();
   }
 });
@@ -463,8 +476,10 @@ router.get('/stream', async (req, res) => {
     if (fileIdx >= 0 && fileIdx < torrent.files.length) {
       videoFile = torrent.files[fileIdx];
     } else {
-      const videoFiles = torrent.files.filter(f => /\.(mp4|mkv|avi|webm|mov)$/i.test(f.name));
-      videoFile = videoFiles.find(f => f.name.endsWith('.mp4')) || videoFiles.sort((a, b) => b.length - a.length)[0];
+      const videoFiles = torrent.files
+        .filter(f => /\.(mp4|mkv|avi|webm|mov)$/i.test(f.name))
+        .sort((a, b) => b.length - a.length);
+      videoFile = videoFiles[0];
     }
 
     if (!videoFile) return res.status(404).json({ error: 'No se encontró archivo de video' });

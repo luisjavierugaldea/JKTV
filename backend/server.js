@@ -116,6 +116,8 @@ app.use(
     contentSecurityPolicy: false,
     // Permite que el frontend lea el stream de audio desde otro origen
     crossOriginResourcePolicy: false,
+    // Permite que el frontend (puerto 3000) pueda incrustar el iframe del backend (puerto 3001)
+    xFrameOptions: false,
   })
 );
 
@@ -259,5 +261,16 @@ async function shutdown(signal) {
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
+// ─── Prevención de Crashes Globales (ej. Errores de Playwright Stealth) ───────
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️ [Global] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ [Global] Uncaught Exception:', err.message);
+  // No salimos del proceso (process.exit) para evitar que la app se caiga por completo
+  // si un scraper o navegador oculto lanza un error repentino.
+});
 
 export default app;

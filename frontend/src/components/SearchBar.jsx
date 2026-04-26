@@ -7,12 +7,26 @@ import { useState, useEffect, useRef } from 'react';
 export default function SearchBar({ onSearch, type, onTypeChange }) {
   const [value, setValue] = useState('');
   const timerRef = useRef(null);
+  const abortRef = useRef(null);
+
+  // Clear search bar when switching categories
+  useEffect(() => {
+    setValue('');
+  }, [type]);
 
   useEffect(() => {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      onSearch(value.trim());
-    }, 450); // debounce 450ms
+      // Cancelar la petición anterior si sigue en vuelo
+      if (abortRef.current) abortRef.current.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      // No buscar si hay menos de 3 letras (evita bombardear el backend)
+      const q = value.trim();
+      if (q.length === 0 || q.length >= 3) {
+        onSearch(q, controller.signal);
+      }
+    }, 600); // Aumentado a 600ms para mayor estabilidad
     return () => clearTimeout(timerRef.current);
   }, [value]);
 

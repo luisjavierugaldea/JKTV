@@ -30,8 +30,11 @@ export default function AnimeRow({ title, searchTerms, onAnimeClick }) {
     let cancelled = false;
     setLoading(true);
 
-    // Probar cada término de búsqueda hasta encontrar resultados
+    // Probar cada término de búsqueda y acumular resultados
     async function fetchAnime() {
+      let allResults = [];
+      const seenIds = new Set();
+
       for (const term of searchTerms) {
         if (cancelled) return;
         
@@ -50,20 +53,24 @@ export default function AnimeRow({ title, searchTerms, onAnimeClick }) {
               vote_count: 100,
             }));
             
-            if (!cancelled) {
-              setItems(normalized);
-              setLoading(false);
+            // Añadir solo los animes que no hayamos visto antes
+            for (const item of normalized) {
+              const id = item.id || item.slug;
+              if (id && !seenIds.has(id)) {
+                seenIds.add(id);
+                allResults.push(item);
+              }
             }
-            return; // Salir después de encontrar resultados
           }
         } catch (err) {
           console.error(`Error buscando anime con término "${term}":`, err);
         }
       }
       
-      // Si llegamos aquí, no se encontraron resultados
+      // Actualizar el estado con todos los resultados combinados
       if (!cancelled) {
-        setItems([]);
+        // Ordenar opcionalmente (ej. por año o rating, aquí lo dejamos como viene de la API)
+        setItems(allResults);
         setLoading(false);
       }
     }

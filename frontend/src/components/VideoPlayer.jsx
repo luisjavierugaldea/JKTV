@@ -80,15 +80,23 @@ const HLS_CONFIG = {
 };
 
 // ── Componentes UI ────────────────────────────────────────────────────────────
-function PopupMenu({ title, children, right = 0, bottom = 'calc(100% + 15px)' }) {
+function PopupMenu({ title, children }) {
   return (
     <div onClick={(e) => e.stopPropagation()} style={{
-      position: 'absolute', right, bottom, background: 'rgba(15,15,20,0.95)',
-      backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
-      overflow: 'hidden', minWidth: 200, boxShadow: '0 16px 48px rgba(0,0,0,0.85)', zIndex: 50,
+      position: 'absolute',
+      right: 0,
+      bottom: 'calc(100% + 10px)',
+      background: 'rgba(15,15,20,0.97)',
+      backdropFilter: 'blur(20px)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: 12,
+      overflow: 'hidden',
+      width: 'min(220px, calc(100vw - 24px))', // ⚡ nunca se sale en móvil
+      boxShadow: '0 -8px 32px rgba(0,0,0,0.85)',
+      zIndex: 50,
     }}>
       <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 }}>{title}</div>
-      <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+      <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
         {children}
       </div>
     </div>
@@ -122,6 +130,7 @@ export default function VideoPlayer({ streamUrl, streamUrls, streamType, title, 
   const [loading, setLoading] = useState(true);
   const [urlIndex, setUrlIndex] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
+  const [proxyIframeUrl, setProxyIframeUrl] = useState(null);
   
   // Estados de Reproductor
   const [isPlaying, setIsPlaying] = useState(false);
@@ -242,7 +251,8 @@ export default function VideoPlayer({ streamUrl, streamUrls, streamType, title, 
   // ── Inicialización ──────────────────────────────────────────────────────────
   useEffect(() => {
     const currentStreamUrl = (streamUrls && streamUrls.length > 0) ? streamUrls[urlIndex] : streamUrl;
-    if (!currentStreamUrl || !videoRef.current) return;
+    if (!currentStreamUrl) return;
+    if (streamType !== 'embed' && !videoRef.current) return;
     const video = videoRef.current;
     
     setError(null);
@@ -293,9 +303,23 @@ export default function VideoPlayer({ streamUrl, streamUrls, streamType, title, 
       }
     } else if (streamType === 'embed') {
       const backendURL = API_BASE_URL.replace('/api', '');
-      // Pasamos el URL por el proxy de iframe para evadir X-Frame-Options
-      activeStreamUrl = `${backendURL}/api/proxy-stream/iframe?url=${encodeURIComponent(currentStreamUrl)}`;
+      
+      // La gran mayoria de reproductores (vimeos, mp4upload, zilla, streamwish, etc)
+      // bloquean con 403 o no cargan si se proxifican (pierden su Referrer o CORS real).
+      // Solo usaremos el proxy para URLs que explícitamente sabemos que tienen X-Frame-Options
+      // o que necesitan inyección de cookies/tokens (como player.php de Cuevana).
+      
+      const requiresProxy = currentStreamUrl.includes('player.php');
+      
+      if (requiresProxy) {
+        activeStreamUrl = `${backendURL}/api/proxy-stream/iframe?url=${encodeURIComponent(currentStreamUrl)}`;
+      } else {
+        activeStreamUrl = currentStreamUrl;
+      }
+      
+      setProxyIframeUrl(activeStreamUrl);
     }
+
 
     if (activeStreamType === 'hls' && Hls.isSupported()) {
       const hls = new Hls(HLS_CONFIG);
@@ -339,17 +363,19 @@ export default function VideoPlayer({ streamUrl, streamUrls, streamType, title, 
               // Todavía hay fuentes alternativas, intentamos con la siguiente
               hls.destroy();
               setUrlIndex(urlIndex + 1);
-            } else if (isNoSignal) {
-              // Todas las fuentes fallaron, pero es un bloqueo temporal (PPV sin evento)
-              // NO auto-saltamos, NO borramos de la lista — solo mostramos mensaje de espera
-              console.log('[VideoPlayer] 📡 Sin señal ahora (PPV/evento no activo). Canal conservado en lista.');
-              if (onNoSignal) onNoSignal();
-              setError('📡 Sin señal en este momento. Este canal puede ser un evento PPV.\n\nVuelve a intentarlo cuando comience el evento.');
-              setLoading(false);
             } else {
-              // Error de red real (404) → canal muerto → auto-skip
-              if (onFatalError) onFatalError();
-              hls.startLoad();
+              // Todas las fuentes fallaron
+              if (httpStatus === 504) {
+                setError('El servidor (o Torrent) no respondió a tiempo o no tiene semillas activas. Prueba otra opción.');
+              } else if (isNoSignal) {
+                console.log('[VideoPlayer] 📡 Sin señal ahora (PPV/evento no activo). Canal conservado en lista.');
+                if (onNoSignal) onNoSignal();
+                setError('📡 Sin señal en este momento. Este canal puede ser un evento PPV.\n\nVuelve a intentarlo cuando comience el evento.');
+              } else {
+                if (onFatalError) onFatalError();
+                setError(`Error de red (HTTP ${httpStatus || 'Desconocido'}). El archivo de video no está disponible o el enlace caducó.`);
+              }
+              setLoading(false);
             }
           }
           else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
@@ -411,7 +437,7 @@ export default function VideoPlayer({ streamUrl, streamUrls, streamType, title, 
       video.src = streamUrl;
       video.addEventListener('loadedmetadata', () => { setLoading(false); video.play().catch(() => { }); }, { once: true });
 
-    } else {
+    } else if (streamType !== 'embed') {
       // MP4 DIRECTO
       video.src = streamUrl;
       video.addEventListener('loadedmetadata', () => setLoading(false), { once: true });
@@ -431,11 +457,38 @@ export default function VideoPlayer({ streamUrl, streamUrls, streamType, title, 
 
   if (streamType === 'embed') {
     return (
-      <div ref={containerRef} style={{ position: 'relative', borderRadius: isFullscreen ? 0 : 12, overflow: 'hidden', background: '#000', ...(isFullscreen ? { height: '100vh' } : { minHeight: 300 }) }}>
-        <iframe src={streamUrl} style={{ width: '100%', height: isFullscreen ? '100vh' : '540px', border: 'none', display: 'block' }} allowFullScreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" title={title} />
-        <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 20 }}>
-          <button onClick={toggleFullscreen} style={{ background: 'rgba(0,0,0,0.7)', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-             {isFullscreen ? <IconExitFullscreen/> : <IconFullscreen/>}
+      <div ref={containerRef} style={{
+        position: 'relative',
+        borderRadius: isFullscreen ? 0 : 12,
+        overflow: 'hidden',
+        background: '#000',
+        ...(isFullscreen ? { height: '100vh' } : {}),
+      }}>
+        <iframe
+          src={proxyIframeUrl || streamUrl}
+          style={{
+            width: '100%',
+            height: isFullscreen ? '100vh' : 'min(540px, 56.25vw)',
+            minHeight: 220,
+            border: 'none',
+            display: 'block',
+          }}
+          allowFullScreen
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          title={title}
+        />
+        {/* Botón fullscreen */}
+        <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 20 }}>
+          <button
+            onClick={toggleFullscreen}
+            style={{
+              background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none',
+              width: 34, height: 34, borderRadius: 8, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backdropFilter: 'blur(4px)',
+            }}
+          >
+            {isFullscreen ? <IconExitFullscreen/> : <IconFullscreen/>}
           </button>
         </div>
       </div>

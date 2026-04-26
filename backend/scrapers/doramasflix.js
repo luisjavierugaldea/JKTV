@@ -13,7 +13,7 @@
 
 import { createContext } from './browserPool.js';
 
-const BASE         = 'https://doramasflix.co';
+const BASE         = 'https://doramasflix.io';
 const PAGE_TIMEOUT = 20_000;
 const INPUT_WAIT   = 8_000;
 
@@ -30,11 +30,11 @@ function toSlug(text) {
     .replace(/^-+|-+$/g, '');                           // recortar bordes
 }
 
-function buildSlugCandidates(title, originalTitle) {
+function buildSlugCandidates(title, originalTitle, englishTitle) {
   const seen = new Set();
   const add  = (s) => { if (s) seen.add(s); };
 
-  for (const t of [title, originalTitle].filter(Boolean)) {
+  for (const t of [englishTitle, title, originalTitle].filter(Boolean)) {
     add(toSlug(t));
     // Sin año final "(2026)" o "2026"
     add(toSlug(t.replace(/\s*\(?\d{4}\)?\s*$/, '').trim()));
@@ -66,42 +66,65 @@ async function fetchEmbeds(pageUrl) {
 
     await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
 
-    // Esperar a que React popule los inputs con URLs de embed
+    // Verificar si es 404 antes de esperar
+    const is404 = await page.evaluate(() => {
+      const h1 = document.querySelector('h1')?.innerText || '';
+      const title = document.title || '';
+      return !h1 || h1 === '' || title.includes('404') || title.includes('Not Found');
+    }).catch(() => false);
+
+    if (is404) return [];
+
+    // Esperar a que carguen los iframes de los reproductores
     await page.waitForFunction(
       () => {
-        const inputs = document.querySelectorAll('input[type="text"]');
-        return [...inputs].some((i) => i.value && i.value.startsWith('http'));
+        const iframes = document.querySelectorAll('iframe');
+        return [...iframes].some((i) => {
+          const src = i.src || '';
+          return src.startsWith('http') && !src.includes('google') && !src.includes('facebook');
+        });
       },
       { timeout: INPUT_WAIT }
-    ).catch(() => {/* continuar aunque no haya inputs */});
+    ).catch(() => {/* continuar aunque no haya iframes */});
 
     // Pausa extra para que todos los inputs se llenen
     await page.waitForTimeout(1_500);
 
-    // Verificar que no es 404 (página vacía / no encontrada)
-    const notFound = await page.evaluate(() => {
-      const h1 = document.querySelector('h1');
-      return !h1 || h1.textContent.trim() === '' || document.title.includes('404');
-    });
-    if (notFound) return [];
+    // Extraer todas las opciones haciendo click en cada botón
+    const servers = [];
+    const locators = await page.locator('figcaption').all();
+    for (let loc of locators) {
+      try {
+        await loc.click({ force: true, timeout: 2000 }).catch(() => {});
+        await page.waitForTimeout(800); // Dar tiempo a que React actualice el iframe
+        
+        const data = await page.evaluate(() => {
+          const iframe = document.querySelector('iframe');
+          return iframe ? iframe.src : null;
+        });
 
-    // Leer las URLs de embed de los <input type="text">
-    const servers = await page.evaluate(() => {
-      const results = [];
-      document.querySelectorAll('input[type="text"]').forEach((input) => {
-        const url = input.value?.trim();
-        if (!url || !url.startsWith('http')) return;
-
-        // Nombre del servidor desde el figcaption adyacente
-        const container = input.closest('div');
-        const nameEl = container?.querySelector('figcaption span:last-child')
-                    ?? container?.querySelector('figcaption span');
-        const name = nameEl?.textContent?.trim() || 'Servidor';
-
-        results.push({ url, name });
-      });
-      return results;
-    });
+        if (data && data.includes('fkplayer.xyz/e/')) {
+          const token = data.split('/e/')[1];
+          const parts = token.split('.');
+          if (parts.length >= 2) {
+            const payloadStr = Buffer.from(parts[1], 'base64').toString('utf-8');
+            const payload = JSON.parse(payloadStr);
+            if (payload.link) {
+              const realUrl = Buffer.from(payload.link, 'base64').toString('utf-8');
+              const text = await loc.innerText();
+              const name = text.replace(/\n/g, ' ').split('|')[0].trim() || 'DoramasFlix Server';
+              servers.push({ url: realUrl, name: name });
+            }
+          }
+        } else if (data && data.startsWith('http') && !data.includes('google') && !data.includes('facebook')) {
+          const text = await loc.innerText();
+          const name = text.replace(/\n/g, ' ').split('|')[0].trim() || 'DoramasFlix Server';
+          servers.push({ url: data, name: name });
+        }
+      } catch (e) {
+        // Ignorar si un botón falla
+      }
+    }
 
     if (servers.length > 0) {
       console.log(`  ✅  [DoramasFlux] ${servers.length} servidores en: ${pageUrl}`);
@@ -123,19 +146,19 @@ async function fetchEmbeds(pageUrl) {
  *
  * @returns {Promise<Array<{ id, name, embedUrl, language, qualityHint }>>}
  */
-export async function getDoramasFlixEmbedUrls({ title, originalTitle, type = 'movie' }) {
+export async function getDoramasFlixEmbedUrls({ title, originalTitle, englishTitle, type = 'movie' }) {
   const section = type === 'tv' ? 'doramas' : 'peliculas';
-  const slugs   = buildSlugCandidates(title, originalTitle);
+  const slugs   = buildSlugCandidates(title, originalTitle, englishTitle);
 
   for (const slug of slugs) {
     const url = `${BASE}/${section}/${slug}`;
-    console.log(`  🐉  [DoramasFlux] → ${url}`);
+    console.log(`  🐉  [DoramasFlix] → ${url}`);
 
     const servers = await fetchEmbeds(url);
     if (servers.length > 0) {
       return servers.map((s, i) => ({
         id:          `doramasflix_${i + 1}`,
-        name:        `DoramasFlux (${s.name})`,
+        name:        `DoramasFlix (${s.name})`,
         embedUrl:    s.url,
         language:    'Subtitulado',
         qualityHint: '1080p',
@@ -151,8 +174,8 @@ export async function getDoramasFlixEmbedUrls({ title, originalTitle, type = 'mo
  * Busca y devuelve embed URLs de DoramasFlix para episodios de series/Kdramas.
  * Formato esperado: /capitulos/{slug}-{season}x{episode}
  */
-export async function getDoramasFlixEpisodeEmbeds({ title, originalTitle, season, episode }) {
-  const slugs = buildSlugCandidates(title, originalTitle);
+export async function getDoramasFlixEpisodeEmbeds({ title, originalTitle, englishTitle, season, episode }) {
+  const slugs = buildSlugCandidates(title, originalTitle, englishTitle);
 
   for (const slug of slugs) {
     const url = `${BASE}/capitulos/${slug}-${season}x${episode}`;
@@ -178,8 +201,8 @@ export async function getDoramasFlixEpisodeEmbeds({ title, originalTitle, season
  * Busca y devuelve embed URLs de DoramasFlix para películas asiáticas.
  * Formato esperado: /peliculas/{slug}
  */
-export async function getDoramasFlixMovieEmbeds({ title, originalTitle }) {
-  const slugs = buildSlugCandidates(title, originalTitle);
+export async function getDoramasFlixMovieEmbeds({ title, originalTitle, englishTitle }) {
+  const slugs = buildSlugCandidates(title, originalTitle, englishTitle);
 
   for (const slug of slugs) {
     const url = `${BASE}/peliculas/${slug}`;

@@ -211,10 +211,11 @@ router.get('/iframe', async (req, res) => {
     delete safeHeaders['content-security-policy'];
     delete safeHeaders['set-cookie'];
 
-    // Inyectar etiqueta <base> para que las rutas relativas (/js/player.js) funcionen
+    // Inyectar etiqueta <base> para que las rutas relativas funcionen
+    // Y un meta referrer 'no-referrer' para evitar que los CDNs (vimeos, streamwish) bloqueen peticiones desde localhost
     const modifiedHtml = data.replace(
       /<head>/i,
-      `<head>\n<base href="${origin}/">`
+      `<head>\n<base href="${origin}/">\n<meta name="referrer" content="no-referrer">`
     );
 
     res.set(safeHeaders);

@@ -16,13 +16,14 @@ import TVEpisodeSelector from './TVEpisodeSelector';
 import { stream as streamApi } from '../lib/api';
 
 export default function MovieModal({ movie, type = 'movie', onClose }) {
-  const [streams, setStreams]           = useState([]);
+  const [streams, setStreams]               = useState([]);
   const [selectedStream, setSelectedStream] = useState(null);
-  const [loading, setLoading]           = useState(false);
-  const [error, setError]               = useState(null);
-  const [season, setSeason]             = useState(1);
-  const [episode, setEpisode]           = useState(1);
-  const [hasSearched, setHasSearched]   = useState(false);
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState(null);
+  const [season, setSeason]                 = useState(1);
+  const [episode, setEpisode]               = useState(1);
+  const [hasSearched, setHasSearched]       = useState(false);
+  const [showServerPanel, setShowServerPanel] = useState(false); // ⚙️ Panel flotante de servidores
 
   // Defensivo: TMDB usa 'title' para películas y 'name' para series
   const title = movie.title ?? movie.name ?? movie.original_title ?? movie.original_name ?? '';
@@ -93,6 +94,8 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
       const { data } = await streamApi.get(params);
       if (data.success && data.streams?.length > 0) {
         setStreams(data.streams);
+        // ⚡ Siempre auto-seleccionar el primer servidor (el más popular/Latino)
+        setSelectedStream(data.streams[0]);
       } else {
         setError('No se encontraron servidores disponibles para este título.');
       }
@@ -147,7 +150,7 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>✕</button>
 
-        {/* Hero backdrop (se oculta si el reproductor está activo para dar espacio) */}
+        {/* Hero backdrop — solo si NO hay stream activo */}
         {!selectedStream && poster && (
           <div style={{
             width: '100%', height: 220, overflow: 'hidden',
@@ -167,7 +170,7 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
         {/* Contenido Principal */}
         <div style={{ padding: '0 28px 32px', marginTop: (!selectedStream && poster) ? -60 : 28 }}>
 
-          {/* Info de la película (solo si no se está reproduciendo o si es pequeño) */}
+          {/* Info de la película (solo si no se está reproduciendo) */}
           {!selectedStream && (
             <div style={{ display: 'flex', gap: 20, alignItems: 'flex-end', marginBottom: 24, position: 'relative' }}>
               {poster && (
@@ -249,159 +252,112 @@ export default function MovieModal({ movie, type = 'movie', onClose }) {
             </div>
           )}
 
-          {/* 4. Selector de Servidores */}
-          {streams.length > 0 && !selectedStream && !loading && (
-            <div style={{ animation: 'fadeIn 0.4s ease' }}>
-              <ServerSelector
-                streams={streams}
-                activeStream={selectedStream}
-                onSelect={(s) => setSelectedStream(s)}
-              />
-            </div>
-          )}
+          {/* 4. Selector de Servidores — panel flotante, se activa con ⚙️ */}
 
-          {/* 5. Reproductor */}
+          {/* 5. Reproductor — vista compacta tipo YouTube */}
           {selectedStream && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeIn 0.5s ease' }}>
-              {/* Info mínima arriba del player */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => setSelectedStream(null)}
-                    style={{
-                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                      color: 'rgba(255,255,255,0.6)', padding: '6px 14px', borderRadius: 8,
-                      cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6
-                    }}
-                  >← Volver a servidores</button>
-                  
-                  {type === 'tv' && (
-                    <button
-                      onClick={handleBackToEpisodes}
-                      style={{
-                        background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)',
-                        color: '#60a5fa', padding: '6px 14px', borderRadius: 8,
-                        cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6,
-                        fontWeight: 600
-                      }}
-                    >📺 Ver Episodios</button>
-                  )}
-                  
-                  <div style={{ fontSize: '0.9rem' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Reproduciendo desde: </span>
-                    <span style={{ fontWeight: 700 }}>{selectedStream.server}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 8px' }}>|</span>
-                    <span style={{ color: '#4ade80', fontWeight: 700 }}>{selectedStream.language}</span>
-                    {type === 'tv' && (
-                      <>
-                        <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 8px' }}>|</span>
-                        <span style={{ color: '#60a5fa', fontWeight: 700 }}>T{season} EP{episode}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'fadeIn 0.4s ease' }}>
+
+              {/* Video con panel flotante */}
+              <div style={{ position: 'relative' }}>
+                <VideoPlayer
+                  streamUrl={selectedStream.url}
+                  streamType={selectedStream.type}
+                  title={title}
+                  meta={{ id: movie.id, type, season, episode }}
+                  onNextEpisode={type === 'tv' ? handleNextEpisode : null}
+                />
+                {/* ServerSelector flotante ENCIMA del video */}
+                <ServerSelector
+                  streams={streams}
+                  activeStream={selectedStream}
+                  onSelect={(s) => { setSelectedStream(s); setShowServerPanel(false); }}
+                  isOpen={showServerPanel}
+                  onClose={() => setShowServerPanel(false)}
+                />
               </div>
 
-              <VideoPlayer
-                streamUrl={selectedStream.url}
-                streamType={selectedStream.type}
-                title={title}
-                meta={{
-                  id: movie.id,
-                  type: type,
-                  season: season,
-                  episode: episode
-                }}
-                onNextEpisode={type === 'tv' ? handleNextEpisode : null}
-              />
+              {/* Barra de info — compacta, pegada al video */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px',
+                background: 'rgba(255,255,255,0.03)',
+                borderTop: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '0 0 12px 12px',
+                flexWrap: 'nowrap', overflow: 'hidden',
+              }}>
+                {/* Botón episodios (solo series) */}
+                {type === 'tv' && (
+                  <button
+                    onClick={handleBackToEpisodes}
+                    style={{
+                      background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.2)',
+                      color: '#60a5fa', padding: '4px 10px', borderRadius: 6,
+                      cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600,
+                      whiteSpace: 'nowrap', flexShrink: 0,
+                    }}
+                  >📺 {`T${season}·E${episode}`}</button>
+                )}
 
-              {/* Navegación de episodios (solo para series) */}
+                {/* Servidor activo — crece para llenar espacio */}
+                <span style={{
+                  fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+                }}>
+                  <b style={{ color: 'rgba(255,255,255,0.8)' }}>{selectedStream.server}</b>
+                  {' · '}
+                  <span style={{ color: '#4ade80' }}>{selectedStream.language}</span>
+                </span>
+
+                {/* Botón ⚙️ — sólo si hay más de 1 servidor */}
+                {streams.length > 1 && (
+                  <button
+                    onClick={() => setShowServerPanel(p => !p)}
+                    title="Cambiar servidor"
+                    style={{
+                      background: showServerPanel ? 'rgba(229,9,20,0.2)' : 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${showServerPanel ? 'rgba(229,9,20,0.35)' : 'rgba(255,255,255,0.1)'}`,
+                      color: '#fff', borderRadius: 6,
+                      padding: '4px 10px', cursor: 'pointer',
+                      fontSize: '0.75rem', fontWeight: 600,
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      flexShrink: 0, whiteSpace: 'nowrap',
+                      transition: 'all 0.15s',
+                    }}
+                  >⚙️ {streams.length}</button>
+                )}
+              </div>
+
+              {/* Navegación de episodios compacta (solo series) */}
               {type === 'tv' && (
                 <div style={{
-                  display: 'flex',
-                  gap: 12,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  padding: '16px 0',
-                  borderTop: '1px solid rgba(255,255,255,0.08)',
-                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                  display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center',
+                  padding: '10px 0 4px',
                 }}>
                   <button
-                    onClick={handlePrevEpisode}
-                    disabled={episode <= 1}
+                    onClick={handlePrevEpisode} disabled={episode <= 1}
                     style={{
-                      background: episode > 1 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      color: episode > 1 ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)',
-                      padding: '10px 20px',
-                      borderRadius: 8,
-                      cursor: episode > 1 ? 'pointer' : 'not-allowed',
-                      fontSize: '0.9rem',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      transition: 'all 0.2s',
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                      color: episode > 1 ? '#fff' : 'rgba(255,255,255,0.25)',
+                      padding: '7px 16px', borderRadius: 8, cursor: episode > 1 ? 'pointer' : 'not-allowed',
+                      fontSize: '0.85rem', fontWeight: 600,
                     }}
-                    onMouseEnter={(e) => {
-                      if (episode > 1) {
-                        e.target.style.background = 'rgba(255,255,255,0.1)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (episode > 1) {
-                        e.target.style.background = 'rgba(255,255,255,0.05)';
-                      }
-                    }}
-                  >
-                    ⬅️ Anterior
-                  </button>
-                  
-                  <div style={{
-                    padding: '8px 16px',
-                    background: 'rgba(96,165,250,0.1)',
-                    border: '1px solid rgba(96,165,250,0.2)',
-                    borderRadius: 8,
-                    color: '#60a5fa',
-                    fontWeight: 700,
-                    fontSize: '0.95rem',
-                  }}>
-                    Temporada {season} · Episodio {episode}
-                  </div>
-                  
+                  >⬅ Anterior</button>
+                  <span style={{
+                    padding: '6px 12px', background: 'rgba(96,165,250,0.1)',
+                    border: '1px solid rgba(96,165,250,0.2)', borderRadius: 8,
+                    color: '#60a5fa', fontWeight: 700, fontSize: '0.85rem',
+                  }}>T{season} · E{episode}</span>
                   <button
                     onClick={handleNextEpisode}
                     style={{
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      color: 'rgba(255,255,255,0.9)',
-                      padding: '10px 20px',
-                      borderRadius: 8,
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      transition: 'all 0.2s',
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                      color: '#fff', padding: '7px 16px', borderRadius: 8, cursor: 'pointer',
+                      fontSize: '0.85rem', fontWeight: 600,
                     }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = 'rgba(255,255,255,0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = 'rgba(255,255,255,0.05)';
-                    }}
-                  >
-                    Siguiente ➡️
-                  </button>
+                  >Siguiente ➡</button>
                 </div>
               )}
-
-              {/* Sinopsis pequeña abajo del player */}
-              <div style={{ padding: '0 4px' }}>
-                <h4 style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Sinopsis</h4>
-                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', lineHeight: 1.6 }}>{overview}</p>
-              </div>
             </div>
           )}
         </div>

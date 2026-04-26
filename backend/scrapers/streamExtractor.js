@@ -25,7 +25,7 @@ import { enc } from '../routes/proxyStream.js';
 // ─── Cliente TMDB ─────────────────────────────────────────────────────────────
 const tmdb = axios.create({
   baseURL: config.tmdb.baseUrl,
-  params: { api_key: config.tmdb.apiKey, language: 'es-ES' },
+  params: { api_key: config.tmdb.apiKey, language: 'es-MX' },
   timeout: 8_000,
 });
 
@@ -186,29 +186,39 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
   // 🔥 CONDICIÓN CRÍTICA: Ruteo Inteligente
   if (type === 'movie') {
     const isAsianMovie = originCountries.some(c => ['KR', 'JP', 'CN', 'TH', 'TW'].includes(c));
-    console.log(` 🎬 [Extractor] Modo Película: Usando Cuevana${isAsianMovie ? ' + DoramasFlix' : ''} y Torrentio`);
+    console.log(` 🎬 [Extractor] Modo Película: Usando Cuevana${isAsianMovie ? ' + DoramasFlix' : ''}`);
     
-    scraperPromises.push(getCuevanaEmbedUrls({ title: mediaInfo.title, originalTitle: mediaInfo.originalTitle, year: mediaInfo.year, type, season, episode }).catch(() => []));
+    scraperPromises.push(getCuevanaEmbedUrls({ 
+      title: mediaInfo.title, 
+      originalTitle: mediaInfo.originalTitle, 
+      englishTitle: mediaInfo.englishTitle, 
+      userQuery: title, 
+      alternativeTitles: mediaInfo.alternativeTitles,
+      year: mediaInfo.year, 
+      type, 
+      season, 
+      episode 
+    }).catch(() => []));
     
     if (isAsianMovie) {
-      scraperPromises.push(getDoramasFlixMovieEmbeds({ title: mediaInfo.title, originalTitle: mediaInfo.originalTitle }).catch(() => []));
+      scraperPromises.push(getDoramasFlixMovieEmbeds({ title: mediaInfo.title, originalTitle: mediaInfo.originalTitle, englishTitle: mediaInfo.englishTitle }).catch(() => []));
     }
   } else if (isAnime) {
-    console.log(' 🎌 [Extractor] Modo Anime: Añadiendo PelisPlus(Anime), AnimeFLV, JKAnime');
-    scraperPromises.push(getPelisPlusAnimeEmbeds({ title: mediaInfo.title, season, episode }).catch(() => []));
+    console.log(' 🎌 [Extractor] Modo Anime: Añadiendo AnimeFLV, JKAnime');
     scraperPromises.push(getAnimeFLVEmbedUrls({ title: mediaInfo.title, type, season, episode }).catch(() => []));
     scraperPromises.push(getJKAnimeEmbedUrls({ title: mediaInfo.title, type, season, episode }).catch(() => []));
   } else if (isKdrama) {
     console.log(' 🇰🇷 [Extractor] Modo Kdrama: Añadiendo DoramasFlix');
-    scraperPromises.push(getDoramasFlixEpisodeEmbeds({ title: mediaInfo.title, originalTitle: mediaInfo.originalTitle, season, episode }).catch(() => []));
+    scraperPromises.push(getDoramasFlixEpisodeEmbeds({ title: mediaInfo.title, originalTitle: mediaInfo.originalTitle, englishTitle: mediaInfo.englishTitle, season, episode }).catch(() => []));
   } else {
-    console.log(' 📺 [Extractor] Modo Serie: Añadiendo PelisPlus(Serie)');
-    scraperPromises.push(getPelisPlusSeriesEmbeds({ title: mediaInfo.title, season, episode }).catch(() => []));
+    console.log(' 📺 [Extractor] Modo Serie: Añadiendo Cuevana');
+    scraperPromises.push(getCuevanaEmbedUrls({ title: mediaInfo.title, originalTitle: mediaInfo.originalTitle, englishTitle: mediaInfo.englishTitle, userQuery: title, alternativeTitles: mediaInfo.alternativeTitles, year: mediaInfo.year, type, season, episode }).catch(() => []));
   }
 
   const resultsArray = await Promise.all(scraperPromises);
   const allScraperEmbeds = resultsArray.flat();
   const scraperResults = [];
+  let stremioResults = [];
 
   // ⚡ MODO EMBED (ANTI-BOT): Ya no extraemos el MP4 crudo. 
   // Enviamos el iframe directo a la app para evitar el Error 502 y hacer la búsqueda instantánea.
@@ -225,9 +235,9 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
   });
   await Promise.all(scraperTasks.map(t => t()));
 
-  // 2. Stremio Addons (Torrentio) - Siempre corre, es súper rápido
-  let stremioResults = [];
-  const imdbId = await getImdbIdFromTmdb(mediaInfo.tmdbId, type === 'tv' ? 'series' : 'movie', config.tmdb.apiKey);
+  /* 
+  // 2. Stremio Addons (Torrentio) - DESACTIVADO POR AHORA
+  const imdbId = await getImdbIdFromTmdb(mediaInfo.tmdbId, type === 'tv' ? 'series' : 'movie', config.tmdb.apiKey).catch(() => null);
   if (imdbId) {
     const stremioEmbeds = await getStremioAddonStreams({ type: type === 'tv' ? 'series' : 'movie', imdbId, season, episode });
     stremioResults = stremioEmbeds.map(e => ({
@@ -240,6 +250,7 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
       sourceId: e.id
     }));
   }
+  */
 
   // 3. Backup Sources (Vidsrc, etc) - Son APIs HTTP, no gastan Chromium
   const backupResults = [];
@@ -265,7 +276,7 @@ export async function extractAllStreams({ title, year, type = 'movie', season = 
 
 
 /**
- * ─── LÓGICA DE FILTRADO Y ORDENAMIENTO (1 TORRENT + TOP 3 WEB) ───
+ * ─── LÓGICA DE FILTRADO Y ORDENAMIENTO (TOP 10 WEB) ───
  */
 function buildFinalResponse(results, mediaInfo, type, season, episode) {
   if (results.length === 0) throw new AppError('No se encontraron streams.', 404);
@@ -286,28 +297,13 @@ function buildFinalResponse(results, mediaInfo, type, season, episode) {
 
   // 2. Buscar preferiblemente los que estén en Latino
   let pool = results.filter(s => s.language.includes('Latino'));
+  if (pool.length === 0) pool = results;
 
-  if (pool.length === 0) {
-    pool = results;
-  }
+  // 3. Selección final (Solo Web/Cuevana/Backup por ahora, excluyendo torrents si los hubiera)
+  const webStreams = pool.filter(s => s.type !== 'torrent');
+  const finalSelection = webStreams.slice(0, 10);
 
-  // 3. Separar en dos "Cajas" (Torrents vs Web)
-  const torrentStreams = pool.filter(s => s.type === 'torrent' || (s.server && s.server.toLowerCase().includes('torrentio')));
-  const webStreams = pool.filter(s => s.type !== 'torrent' && !(s.server && s.server.toLowerCase().includes('torrentio')));
-
-  let finalSelection = [];
-
-  // 4. Extraer el Top de Torrents (Hasta 5 para dar variedad)
-  if (torrentStreams.length > 0) {
-    finalSelection = [...finalSelection, ...torrentStreams.slice(0, 5)];
-  }
-
-  // 5. Extraer el Top de la Web (Hasta 10 para ver múltiples servidores de Cuevana, PelisPlus, etc.)
-  if (webStreams.length > 0) {
-    finalSelection = [...finalSelection, ...webStreams.slice(0, 10)];
-  }
-
-  console.log(`[Extractor] ✅ Selección Final: ${torrentStreams.slice(0, 5).length} Torrents + ${webStreams.slice(0, 10).length} Web`);
+  console.log(`[Extractor] ✅ Selección Final: ${finalSelection.length} servidores (Cuevana/Web)`);
 
   return {
     success: true,
@@ -321,10 +317,25 @@ export async function resolveTmdbMovie(title, year) {
   const { data } = await tmdb.get('/search/movie', { params: { query: title, year } });
   if (!data.results?.length) throw new AppError('No encontrado en TMDB', 404);
   const m = data.results[0];
+  
+  let englishTitle = null;
+  let alternativeTitles = [];
+
+  try {
+    const [enData, altData] = await Promise.all([
+      tmdb.get(`/movie/${m.id}`, { params: { language: 'en-US' } }),
+      tmdb.get(`/movie/${m.id}/alternative_titles`)
+    ]);
+    englishTitle = enData.data.title;
+    alternativeTitles = (altData.data.titles || []).map(t => t.title);
+  } catch(e) {}
+
   return { 
     tmdbId: String(m.id), 
     title: m.title, 
-    originalTitle: m.original_title, 
+    originalTitle: m.original_title,
+    englishTitle,
+    alternativeTitles,
     year: m.release_date?.split('-')[0], 
     posterPath: `https://image.tmdb.org/t/p/w500${m.poster_path}`, 
     overview: m.overview,
@@ -337,10 +348,25 @@ export async function resolveTmdbTv(title) {
   const { data } = await tmdb.get('/search/tv', { params: { query: title } });
   if (!data.results?.length) throw new AppError('No encontrado en TMDB', 404);
   const s = data.results[0];
+
+  let englishTitle = null;
+  let alternativeTitles = [];
+
+  try {
+    const [enData, altData] = await Promise.all([
+      tmdb.get(`/tv/${s.id}`, { params: { language: 'en-US' } }),
+      tmdb.get(`/tv/${s.id}/alternative_titles`)
+    ]);
+    englishTitle = enData.data.name;
+    alternativeTitles = (altData.data.results || []).map(t => t.title);
+  } catch(e) {}
+
   return { 
     tmdbId: String(s.id), 
     title: s.name, 
-    originalTitle: s.original_name, 
+    originalTitle: s.original_name,
+    englishTitle,
+    alternativeTitles,
     year: s.first_air_date?.split('-')[0], 
     posterPath: `https://image.tmdb.org/t/p/w500${s.poster_path}`, 
     overview: s.overview,

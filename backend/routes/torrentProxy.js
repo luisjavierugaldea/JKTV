@@ -7,11 +7,22 @@
 import express from 'express';
 import WebTorrent from 'webtorrent';
 import pump from 'pump';
+import ffmpegStatic from 'ffmpeg-static';
+import { execSync } from 'child_process';
 import ffmpeg from 'fluent-ffmpeg';
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+
+let ffmpegPath = ffmpegStatic;
+try {
+  execSync('ffmpeg -version', { stdio: 'ignore' });
+  ffmpegPath = 'ffmpeg';
+} catch (e) {
+  console.log('[FFmpeg] Binario de sistema no encontrado, usando ffmpeg-static (Modo DEV Local)');
+}
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 const router = express.Router();
 
@@ -108,16 +119,16 @@ router.get('/hls/:infoHash/:param1/:param2?', async (req, res) => {
           }
         });
 
-        const torrentPromise = new Promise((resolve, reject) => {
+          const torrentPromise = new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             // Limpiar si ya fue agregado pero sin metadata aún
             const existingTorrent = client.get(infoHash);
             if (existingTorrent && !activeTorrents.has(infoHash)) {
               client.remove(infoHash, { destroyStore: true });
             }
-            console.error(`[HLS] ⏱️ Timeout 90s para torrent ${infoHash} — Swarm sin peers suficientes.`);
-            reject(new Error('Timeout: sin peers en 90 segundos'));
-          }, 90000);
+            console.error(`[HLS] ⏱️ Timeout 20s para torrent ${infoHash} — Swarm sin peers suficientes.`);
+            reject(new Error('Timeout: sin peers en 20 segundos'));
+          }, 20000);
 
           // Verificar si WebTorrent ya tiene este torrent Y ya tiene archivos listos
           const existing = client.get(infoHash);

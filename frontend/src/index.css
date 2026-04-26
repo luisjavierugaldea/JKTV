@@ -137,15 +137,37 @@ body {
   position: absolute;
   top: 10px;
   right: 10px;
-  background: rgba(0,0,0,0.75);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,200,0,0.3);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 215, 0, 0.4);
   color: #ffd700;
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 4px 10px;
   border-radius: 99px;
   pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 8px rgba(255, 215, 0, 0.15);
+  z-index: 1;
+}
+
+/* ── Badge de año ──────────────────────────────────────────────────────────── */
+.year-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(20, 20, 30, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1;
 }
 
 /* ── Input de búsqueda ─────────────────────────────────────────────────────── */
@@ -418,15 +440,15 @@ body {
 
   /* ── Modal responsive ── */
   .modal-backdrop {
-    padding: 0 !important;
-    align-items: flex-start !important;
+    padding: 12px !important;
+    align-items: center !important;
   }
   
   .modal-content {
     max-width: 100% !important;
-    max-height: 100vh !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
+    max-height: 95vh !important;
+    border-radius: 14px !important;
+    margin: 0 auto !important;
   }
 
   /* Contenido del modal más compacto */

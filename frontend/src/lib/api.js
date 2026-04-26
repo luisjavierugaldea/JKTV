@@ -24,8 +24,8 @@ export const tmdb = {
   trending: (type = 'movie', window = 'week', page = 1) =>
     api.get(`/tmdb/trending?type=${type}&window=${window}&page=${page}`),
 
-  search: (query, type = 'movie', page = 1) =>
-    api.get(`/tmdb/search?query=${encodeURIComponent(query)}&type=${type}&page=${page}`),
+  search: (query, type = 'movie', page = 1, options = {}) =>
+    api.get(`/tmdb/search?query=${encodeURIComponent(query)}&type=${type}&page=${page}`, { signal: options.signal }),
 
   movieDetail: (id) => api.get(`/tmdb/movie/${id}`),
   tvDetail: (id) => api.get(`/tmdb/tv/${id}`),
@@ -42,12 +42,17 @@ export const tmdb = {
 };
 
 // ── Stream con caché en memoria ──────────────────────────────────────────────
-const STREAM_CACHE_TTL = 30 * 60 * 1000; // 30 minutos
+const STREAM_CACHE_TTL = 60 * 60 * 1000; // 60 minutos (era 30)
 const streamCache = new Map(); // key → { data, expiresAt }
+
+function streamCacheKey(params) {
+  const s = params.type === 'tv' ? `|S${params.season ?? 1}E${params.episode ?? 1}` : '';
+  return `${params.title}|${params.year ?? ''}|${params.type ?? 'movie'}${s}`;
+}
 
 export const stream = {
   get: async (params) => {
-    const key = `${params.title}|${params.year ?? ''}|${params.type ?? 'movie'}`;
+    const key = streamCacheKey(params);
     const cached = streamCache.get(key);
     if (cached && Date.now() < cached.expiresAt) {
       console.log(`[StreamCache] HIT → "${params.title}"`);
@@ -61,7 +66,7 @@ export const stream = {
   },
   // Forzar re-scraping (útil para el botón "Reintentar")
   invalidate: (params) => {
-    const key = `${params.title}|${params.year ?? ''}|${params.type ?? 'movie'}`;
+    const key = streamCacheKey(params);
     streamCache.delete(key);
   },
 };
@@ -69,10 +74,19 @@ export const stream = {
 // ── Anime (AnimeAV1) ──────────────────────────────────────────────────────────
 export const anime = {
   // Buscar anime por nombre
-  search: (query, domain = '') => {
+  search: (query, optionsOrDomain = {}) => {
     const params = new URLSearchParams({ q: query });
-    if (domain) params.set('domain', domain);
-    return api.get(`/anime/search?${params}`);
+    let config = {};
+    
+    if (typeof optionsOrDomain === 'string') {
+      if (optionsOrDomain) params.set('domain', optionsOrDomain);
+    } else if (optionsOrDomain) {
+      if (optionsOrDomain.domain) params.set('domain', optionsOrDomain.domain);
+      config = { ...optionsOrDomain };
+      delete config.domain;
+    }
+    
+    return api.get(`/anime/search?${params}`, config);
   },
 
   // Obtener información completa del anime (con episodios)

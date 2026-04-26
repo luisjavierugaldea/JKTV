@@ -34,6 +34,10 @@ export default function MovieCard({ movie, onClick, type = 'movie' }) {
       {rating && (
         <div className="rating-badge">⭐ {rating}</div>
       )}
+      
+      {year && (
+        <div className="year-badge">{year}</div>
+      )}
 
       <div className="movie-card-overlay">
         <p style={{ fontWeight: 700, fontSize: '0.9rem', lineHeight: 1.3, marginBottom: 4 }}>

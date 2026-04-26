@@ -14,12 +14,15 @@ export default function AnimeModal({ anime, onClose }) {
   const [episodeData, setEpisodeData] = useState(null);
   const [streams, setStreams] = useState([]);
   const [selectedStream, setSelectedStream] = useState(null);
+  const [showServerPanel, setShowServerPanel] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingEpisode, setLoadingEpisode] = useState(false);
   const [error, setError] = useState(null);
 
   const title = anime.title || anime.name || '';
-  const poster = anime.image || (anime.poster_path ? `https://image.tmdb.org/t/p/w500${anime.poster_path}` : null);
+  const poster = anime.image || (anime.poster_path 
+    ? (anime.poster_path.startsWith('http') ? anime.poster_path : `https://image.tmdb.org/t/p/w500${anime.poster_path}`) 
+    : null);
 
   // Cerrar con Escape
   useEffect(() => {
@@ -127,7 +130,8 @@ export default function AnimeModal({ anime, onClose }) {
 
         if (allServers.length > 0) {
           setStreams(allServers);
-          // NO auto-seleccionar servidor - dejar que usuario elija
+          // ⚡ Siempre auto-seleccionar el primer servidor para auto-play
+          setSelectedStream(allServers[0]);
         } else {
           setError('No se encontraron servidores disponibles para este episodio');
         }
@@ -160,20 +164,24 @@ export default function AnimeModal({ anime, onClose }) {
 
   return (
     <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className={`modal-content ${selectedStream ? 'player-active' : ''}`}
+        style={{ maxHeight: selectedStream ? '100vh' : '90vh', overflowY: 'auto' }}>
 
-        {/* Botón Cerrar */}
+        {/* Botón Cerrar — siempre sticky y visible */}
         <button onClick={onClose} aria-label="Cerrar" style={{
-          position: 'sticky', top: 16, float: 'right', marginRight: 16,
-          background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)',
-          color: '#fff', width: 36, height: 36, borderRadius: '50%',
-          cursor: 'pointer', fontSize: '1rem', zIndex: 100,
+          position: 'sticky', top: 8, float: 'right',
+          marginRight: selectedStream ? 8 : 16,
+          marginTop: selectedStream ? 8 : 0,
+          background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.15)',
+          color: '#fff', width: 34, height: 34, borderRadius: '50%',
+          cursor: 'pointer', fontSize: '0.9rem', zIndex: 200,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(8px)',
         }}>✕</button>
 
         {/* Hero Banner */}
         {poster && !selectedStream && (
-          <div style={{
+          <div className="modal-hero" style={{
             width: '100%', height: 240, overflow: 'hidden',
             position: 'relative', borderRadius: '16px 16px 0 0',
           }}>
@@ -190,7 +198,7 @@ export default function AnimeModal({ anime, onClose }) {
         )}
 
         {/* Contenido Principal */}
-        <div style={{ padding: '0 28px 32px', marginTop: (!selectedStream && poster) ? -60 : 28 }}>
+        <div style={{ padding: selectedStream ? '0' : '0 28px 32px', marginTop: (!selectedStream && poster) ? -60 : (selectedStream ? 0 : 28) }}>
 
           {/* Info del Anime */}
           {!selectedStream && (
@@ -312,72 +320,86 @@ export default function AnimeModal({ anime, onClose }) {
             </div>
           )}
 
-          {/* Selector de Servidores */}
-          {streams.length > 0 && !selectedStream && !loadingEpisode && (
-            <div style={{ animation: 'fadeIn 0.4s ease', marginTop: 24 }}>
-              <h3 style={{ 
-                fontSize: '1.1rem', 
-                fontWeight: 700, 
-                marginBottom: 16,
-                color: 'rgba(255,255,255,0.9)'
-              }}>
-                🎬 Selecciona un servidor
-              </h3>
-              <ServerSelector
-                streams={streams}
-                activeStream={selectedStream}
-                onSelect={(s) => setSelectedStream(s)}
-              />
-            </div>
-          )}
-
-          {/* Reproductor */}
+          {/* Reproductor — vista compacta tipo YouTube */}
           {selectedStream && selectedEpisode && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeIn 0.5s ease' }}>
-              {/* Info del episodio */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <button
-                    onClick={() => setSelectedStream(null)}
-                    style={{
-                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                      color: 'rgba(255,255,255,0.6)', padding: '6px 14px', borderRadius: 8,
-                      cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6
-                    }}
-                  >← Cambiar servidor</button>
-                  <div style={{ fontSize: '0.9rem' }}>
-                    <span style={{ fontWeight: 700, color: '#fff' }}>
-                      EP {selectedEpisode.number}
-                    </span>
-                    <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 8px' }}>|</span>
-                    <span style={{ color: 'var(--text-muted)' }}>{selectedStream.server}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 8px' }}>|</span>
-                    <span style={{ 
-                      color: selectedStream.language === 'SUB' ? '#4ade80' : '#60a5fa', 
-                      fontWeight: 700 
-                    }}>
-                      {selectedStream.language}
-                    </span>
-                  </div>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'fadeIn 0.4s ease' }}>
+
+              {/* Video con panel flotante */}
+              <div style={{ position: 'relative' }}>
+                <VideoPlayer
+                  streamUrl={selectedStream.url}
+                  streamType={selectedStream.type}
+                  title={`${title} - Episodio ${selectedEpisode.number}`}
+                  meta={{
+                    id: anime.id || anime.url,
+                    type: 'anime',
+                    season: 1,
+                    episode: selectedEpisode.number
+                  }}
+                  onNextEpisode={
+                    animeInfo?.episodes?.some(ep => ep.number === selectedEpisode.number + 1)
+                      ? handleNextEpisode
+                      : null
+                  }
+                />
+                {/* ServerSelector flotante ENCIMA del video */}
+                <ServerSelector
+                  streams={streams}
+                  activeStream={selectedStream}
+                  onSelect={(s) => { setSelectedStream(s); setShowServerPanel(false); }}
+                  isOpen={showServerPanel}
+                  onClose={() => setShowServerPanel(false)}
+                />
               </div>
 
-              <VideoPlayer
-                streamUrl={selectedStream.url}
-                streamType={selectedStream.type}
-                title={`${title} - Episodio ${selectedEpisode.number}`}
-                meta={{
-                  id: anime.id || anime.url,
-                  type: 'anime',
-                  season: 1,
-                  episode: selectedEpisode.number
-                }}
-                onNextEpisode={
-                  animeInfo?.episodes?.some(ep => ep.number === selectedEpisode.number + 1)
-                    ? handleNextEpisode
-                    : null
-                }
-              />
+              {/* Barra de info — compacta, pegada al video */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px',
+                background: 'rgba(255,255,255,0.03)',
+                borderTop: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '0 0 12px 12px',
+                flexWrap: 'nowrap', overflow: 'hidden',
+              }}>
+                <button
+                  onClick={() => setSelectedStream(null)}
+                  style={{
+                    background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.2)',
+                    color: '#60a5fa', padding: '4px 10px', borderRadius: 6,
+                    cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600,
+                    whiteSpace: 'nowrap', flexShrink: 0,
+                  }}
+                >← Episodios</button>
+
+                <span style={{
+                  fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+                }}>
+                  <span style={{ fontWeight: 700, color: '#fff', marginRight: 4 }}>EP {selectedEpisode.number}</span>
+                  {' · '}
+                  <b style={{ color: 'rgba(255,255,255,0.8)' }}>{selectedStream.server}</b>
+                  {' · '}
+                  <span style={{ color: selectedStream.language === 'SUB' ? '#4ade80' : '#60a5fa' }}>{selectedStream.language}</span>
+                </span>
+
+                {streams.length > 1 && (
+                  <button
+                    onClick={() => setShowServerPanel(p => !p)}
+                    title="Cambiar servidor"
+                    style={{
+                      background: showServerPanel ? 'rgba(229,9,20,0.2)' : 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${showServerPanel ? 'rgba(229,9,20,0.35)' : 'rgba(255,255,255,0.1)'}`,
+                      color: '#fff', borderRadius: 6,
+                      padding: '4px 10px', cursor: 'pointer',
+                      fontSize: '0.75rem', fontWeight: 600,
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      flexShrink: 0, whiteSpace: 'nowrap',
+                      transition: 'all 0.15s',
+                    }}
+                  >⚙️ {streams.length}</button>
+                )}
+              </div>
+
 
               {/* Título del episodio */}
               {selectedEpisode.title && (

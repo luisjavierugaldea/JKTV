@@ -15,11 +15,11 @@ import { tmdb, anime as animeApi, iptv } from './lib/api';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
-function isReleased(item) {
+function isReleased(item, allowUnpopular = false) {
   const date = item.release_date ?? item.first_air_date ?? '';
   if (!date || date > TODAY) return false;
   if (!item.poster_path) return false;
-  if ((item.vote_count ?? 0) < 5) return false;
+  if (!allowUnpopular && (item.vote_count ?? 0) < 5) return false;
   return true;
 }
 
@@ -74,6 +74,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [isFuzzy, setIsFuzzy] = useState(false);
+  const [suggestedTitle, setSuggestedTitle] = useState(null);
   const [selected, setSelected] = useState(null);
   const [selectedType, setSelectedType] = useState('movie');
   const [section, setSection] = useState('trending');
@@ -148,7 +150,7 @@ export default function App() {
   const tmdbSearchType = (type === 'anime' || type === 'kdrama') ? 'tv' : type;
 
   // ── Búsqueda ────────────────────────────────────────────────────────────────
-  const handleSearch = useCallback(async (q, pg = 1) => {
+  const handleSearch = useCallback(async (q, signal, pg = 1) => {
     queryRef.current = q;
     if (!q) {
       setSection('trending');
@@ -157,14 +159,14 @@ export default function App() {
       return;
     }
     setSection('search');
-    if (pg === 1) { setLoading(true); setMovies([]); }
+    if (pg === 1) { setLoading(true); setMovies([]); setIsFuzzy(false); setSuggestedTitle(null); }
     else setLoadingMore(true);
     setError(null);
 
     try {
       // Usar API de anime para búsquedas de anime
       if (type === 'anime') {
-        const { data } = await animeApi.search(q);
+        const { data } = await animeApi.search(q, { signal });
         const results = data.data?.results ?? [];
         // Normalizar resultados de anime al formato esperado
         const normalized = results.map(item => ({
@@ -179,15 +181,23 @@ export default function App() {
         setTotalPages(1); // AnimeAV1 no tiene paginación
         setPage(1);
       } else {
-        // TMDB para movies, tv, kdrama
-        const { data } = await tmdb.search(q, tmdbSearchType, pg);
-        const results = (data.data?.results ?? []).filter(isReleased);
+        const { data } = await tmdb.search(q, tmdbSearchType, pg, { signal });
+        setIsFuzzy(data.data?.isFuzzy || false);
+        setSuggestedTitle(data.data?.suggestedTitle || null);
+        
+        let results = (data.data?.results ?? []).filter(item => isReleased(item));
+        // Si el filtro estricto oculta todo, usar un filtro más flexible
+        if (results.length === 0 && data.data?.results?.length > 0) {
+          results = data.data.results.filter(item => isReleased(item, true));
+        }
         const pages = data.data?.total_pages ?? 1;
         setMovies((prev) => pg === 1 ? results : [...prev, ...results]);
         setTotalPages(pages);
         setPage(pg);
       }
     } catch (err) {
+      // Ignorar errores de peticiones canceladas (usuario sigue escribiendo)
+      if (err.name === 'CanceledError' || err.name === 'AbortError' || err.code === 'ERR_CANCELED') return;
       console.error('Search error:', err);
       setError('Error al buscar. Verifica que el backend esté corriendo.');
     } finally {
@@ -196,16 +206,19 @@ export default function App() {
     }
   }, [type, tmdbSearchType]);
 
+
   function loadMore() {
-    handleSearch(queryRef.current, page + 1);
+    handleSearch(queryRef.current, null, page + 1);
   }
+
 
   function openMovie(movie, forceType) {
     setSelected(movie);
-    // anime/kdrama son siempre series ('tv') para el backend y el scraper
+    // kdrama son siempre series ('tv') para el backend y el scraper
+    // anime ahora tiene su propio AnimeModal especializado
     const resolvedType = forceType ?? type;
     setSelectedType(
-      resolvedType === 'anime' || resolvedType === 'kdrama' ? 'tv' : resolvedType
+      resolvedType === 'kdrama' ? 'tv' : resolvedType
     );
   }
 
@@ -238,29 +251,43 @@ export default function App() {
 
               {/* Nav Tabs Desktop */}
               <nav className="hide-mobile" style={{ display: 'flex', gap: 10 }}>
-                <button className={`tab-btn ${type === 'movie' ? 'active' : ''}`} onClick={() => setType('movie')}>Películas</button>
-                <button className={`tab-btn ${type === 'tv' ? 'active' : ''}`} onClick={() => setType('tv')}>Series</button>
-                <button className={`tab-btn ${type === 'anime' ? 'active' : ''}`} onClick={() => setType('anime')}>Anime</button>
-                <button className={`tab-btn ${type === 'kdrama' ? 'active' : ''}`} onClick={() => setType('kdrama')}>K-Drama</button>
-                <button className={`tab-btn ${type === 'iptv' ? 'active' : ''}`} onClick={() => setType('iptv')}>📺 TV</button>
-                <button className={`tab-btn ${type === 'music' ? 'active' : ''}`} onClick={() => setType('music')}>🎵 Música</button>
+                {['movie', 'tv', 'anime', 'kdrama', 'iptv', 'music'].map(t => (
+                  <button
+                    key={t}
+                    className={`tab-btn ${type === t ? 'active' : ''}`}
+                    onClick={() => {
+                      setType(t);
+                      setSection('trending');
+                      setMovies([]);
+                    }}
+                  >
+                    {t === 'movie' ? 'Películas' : t === 'tv' ? 'Series' : t === 'anime' ? 'Anime' : t === 'kdrama' ? 'K-Drama' : t === 'iptv' ? '📺 TV' : '🎵 Música'}
+                  </button>
+                ))}
               </nav>
             </div>
 
             {/* Lado Derecho: Buscador */}
             <div style={{ width: '100%', maxWidth: 400 }}>
-              <SearchBar onSearch={handleSearch} type={type} />
+              <SearchBar key={type} onSearch={handleSearch} type={type} />
             </div>
           </div>
 
           {/* Nav Tabs Mobile (Solo se ve en móvil) */}
           <nav className="show-mobile" style={{ display: 'none', padding: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto', gap: 8 }}>
-            <button className={`tab-btn ${type === 'movie' ? 'active' : ''}`} onClick={() => setType('movie')}>🎬 Películas</button>
-            <button className={`tab-btn ${type === 'tv' ? 'active' : ''}`} onClick={() => setType('tv')}>📺 Series</button>
-            <button className={`tab-btn ${type === 'anime' ? 'active' : ''}`} onClick={() => setType('anime')}>🎌 Anime</button>
-            <button className={`tab-btn ${type === 'kdrama' ? 'active' : ''}`} onClick={() => setType('kdrama')}>🇰🇷 K-Drama</button>
-            <button className={`tab-btn ${type === 'iptv' ? 'active' : ''}`} onClick={() => setType('iptv')}>📺 TV</button>
-            <button className={`tab-btn ${type === 'music' ? 'active' : ''}`} onClick={() => setType('music')}>🎵 Música</button>
+            {['movie', 'tv', 'anime', 'kdrama', 'iptv', 'music'].map(t => (
+              <button
+                key={t}
+                className={`tab-btn ${type === t ? 'active' : ''}`}
+                onClick={() => {
+                  setType(t);
+                  setSection('trending');
+                  setMovies([]);
+                }}
+              >
+                {t === 'movie' ? '🎬 Películas' : t === 'tv' ? '📺 Series' : t === 'anime' ? '🎌 Anime' : t === 'kdrama' ? '🇰🇷 K-Drama' : t === 'iptv' ? '📺 TV' : '🎵 Música'}
+              </button>
+            ))}
           </nav>
         </header>
 
@@ -275,14 +302,8 @@ export default function App() {
           {/* ── BÚSQUEDA: grid plano ── */}
           {section === 'search' && (
             <>
-              <p className="section-title">
-                Resultados de búsqueda
-                {!loading && movies.length > 0 && (
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 400 }}>
-                    &nbsp;— {movies.length} resultados
-                  </span>
-                )}
-              </p>
+              <p className="section-title">Resultados de búsqueda</p>
+
               <MovieGrid
                 movies={movies}
                 loading={loading}

@@ -61,11 +61,12 @@ export async function getChannelsByCountry() {
             for (const header of possibleCountryHeaders) {
                 const headerText = header.textContent?.trim() || '';
                 
-                // Detectar si es un encabezado de país
+                // Detectar si es un encabezado de país o región
                 const countryNames = [
                     'Argentina', 'Brasil', 'Colombia', 'Chile', 'Ecuador', 
                     'México', 'Perú', 'Uruguay', 'Venezuela', 'España',
-                    'Estados Unidos', 'USA', 'Internacional', 'Deportes', 'Portugal'
+                    'Estados Unidos', 'USA', 'Internacional', 'Deportes', 'Portugal',
+                    'Latinoamerica', 'Mundo'
                 ];
                 
                 let matchedCountry = null;
@@ -299,7 +300,10 @@ function getCountryFlag(countryName) {
         'Estados Unidos': '🇺🇸',
         'USA': '🇺🇸',
         'Inglaterra': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
-        'UK': '🏴󠁧󠁢󠁥󠁮󠁧󠁿'
+        'UK': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+        'Portugal': '🇵🇹',
+        'Latinoamerica': '🌎',
+        'Mundo': '🌍'
     };
     
     // Normalizar nombre del país para búsqueda case-insensitive

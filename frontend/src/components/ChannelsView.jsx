@@ -6,17 +6,30 @@
 import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
-// Helper para obtener banderas reales basadas en el nombre del país
-const getCountryCode = (countryName) => {
+// Helper para obtener banderas O iconos personalizados
+const getCountryIcon = (countryName) => {
   const name = (countryName || '').toLowerCase();
+
+  // 🌍 REGIONES ESPECIALES (Devuelven una URL directa de imagen)
+  if (name.includes('latinoamerica') || name.includes('latinoamérica') || name.includes('latam')) {
+    return 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f30e.png'; // Globo centrado en América
+  }
+  if (name.includes('mundo') || name.includes('internacional') || name.includes('global')) {
+    return 'https://www.vhv.rs/dpng/d/544-5441921_mundo-png-sin-fondo-transparent-png.png'; // Globo con meridianos
+  }
+  if (name.includes('deporte') || name.includes('sports')) {
+    return 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/26bd.png'; // Balón de fútbol
+  }
+
+  // 🇲🇽 PAÍSES NORMALES (Devuelven el código de 2 letras para FlagCDN)
   if (name.includes('argentina')) return 'ar';
   if (name.includes('perú') || name.includes('peru')) return 'pe';
   if (name.includes('colombia')) return 'co';
   if (name.includes('méxico') || name.includes('mexico')) return 'mx';
-  if (name.includes('usa') || name.includes('estados unidos')) return 'us';
+  if (name.includes('usa') || name.includes('estados unidos') || name.includes('eeuu')) return 'us';
   if (name.includes('chile')) return 'cl';
   if (name.includes('brasil')) return 'br';
-  if (name.includes('españa')) return 'es';
+  if (name.includes('españa') || name.includes('espana')) return 'es';
   if (name.includes('uruguay')) return 'uy';
   if (name.includes('ecuador')) return 'ec';
   if (name.includes('venezuela')) return 've';
@@ -28,6 +41,11 @@ const getCountryCode = (countryName) => {
   if (name.includes('costa rica')) return 'cr';
   if (name.includes('panama') || name.includes('panamá')) return 'pa';
   if (name.includes('republica dominicana') || name.includes('república')) return 'do';
+  if (name.includes('cuba')) return 'cu';
+  if (name.includes('puerto rico')) return 'pr';
+  if (name.includes('nicaragua')) return 'ni';
+  if (name.includes('portugal')) return 'pt';
+
   return 'un'; // Código por defecto de la ONU si no encuentra el país
 };
 
@@ -48,8 +66,9 @@ export default function ChannelsView({ onSelectChannel }) {
       
       if (data.success) {
         setCountries(data.data);
-        // No expandir ningún país por defecto (el usuario decide cuál abrir)
-        setExpandedCountries(new Set());
+        if (data.data.length > 0) {
+          setExpandedCountries(new Set([data.data[0].id]));
+        }
       } else {
         throw new Error('Error al cargar canales');
       }
@@ -154,7 +173,7 @@ export default function ChannelsView({ onSelectChannel }) {
               Televisión Global
             </h2>
             <p style={{ color: '#888899', margin: '5px 0 0 0', fontSize: '1rem' }}>
-              Explora {countries.reduce((sum, c) => sum + c.totalCanales, 0)} canales en vivo de {countries.length} países
+              Explora {countries.reduce((sum, c) => sum + c.totalCanales, 0)} canales en vivo de {countries.length} regiones
             </p>
           </div>
           
@@ -174,7 +193,7 @@ export default function ChannelsView({ onSelectChannel }) {
           </button>
         </div>
 
-        {/* BUSCADOR OPTIMIZADO PARA TV (Fácil de ver cuando tiene el foco) */}
+        {/* BUSCADOR OPTIMIZADO PARA TV */}
         <div style={{ position: 'relative' }}>
           <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: '1.2rem', color: '#666' }}>🔍</span>
           <input
@@ -204,7 +223,12 @@ export default function ChannelsView({ onSelectChannel }) {
         ) : (
           filteredCountries.map(country => {
             const isExpanded = expandedCountries.has(country.id);
-            const countryCode = getCountryCode(country.pais);
+            const iconData = getCountryIcon(country.pais);
+            
+            // Si el iconData tiene más de 2 caracteres, es una URL directa (ej. Twemoji). Si no, es para FlagCDN.
+            const imgSrc = iconData.length > 2 
+              ? iconData 
+              : `https://flagcdn.com/w80/${iconData}.png`;
             
             return (
               <div
@@ -228,7 +252,7 @@ export default function ChannelsView({ onSelectChannel }) {
                   onBlur={(e) => e.currentTarget.style.background = 'transparent'}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                    {/* BANDERA REDONDA DESDE CDN */}
+                    {/* CONTENEDOR DE LA BANDERA O ICONO */}
                     <div style={{ 
                       width: 'clamp(48px, 6vw, 64px)', height: 'clamp(48px, 6vw, 64px)', borderRadius: '50%', 
                       background: '#222', border: '2px solid rgba(255,255,255,0.1)', overflow: 'hidden', flexShrink: 0,
@@ -236,7 +260,7 @@ export default function ChannelsView({ onSelectChannel }) {
                       boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
                     }}>
                       <img 
-                        src={`https://flagcdn.com/w80/${countryCode}.png`} 
+                        src={imgSrc} 
                         alt={country.pais} 
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '🌍'; }}

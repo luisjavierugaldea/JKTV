@@ -10,6 +10,8 @@ import IptvDashboard from './components/IptvDashboard';
 import LocalWatchHistory from './components/LocalWatchHistory';
 import MusicDashboard from './components/MusicDashboard';
 import GlobalAudioPlayer from './components/GlobalAudioPlayer';
+import AgendaView from './components/AgendaView';
+import P2PPlayer from './components/P2PPlayer';
 import { MusicProvider } from './context/MusicContext';
 import { tmdb, anime as animeApi, iptv } from './lib/api';
 
@@ -83,6 +85,9 @@ export default function App() {
   const [totalPages, setTotalPages] = useState(1);
   const [heroBg, setHeroBg] = useState(null); // película para el hero banner
   const queryRef = useRef('');
+  
+  // ── Estado para eventos deportivos y reproductor P2P ──────────────────────
+  const [selectedSportsChannel, setSelectedSportsChannel] = useState(null);
 
   // ── Cargar hero banner desde trending ───────────────────────────────────────
   useEffect(() => {
@@ -103,6 +108,13 @@ export default function App() {
           setError(err.response?.data?.error?.message || 'Error cargando canales de TV.');
         })
         .finally(() => setLoading(false));
+    }
+    // Para events (eventos deportivos), no necesitamos pre-cargar nada
+    else if (type === 'events') {
+      setMovies([]);
+      setHeroBg(null);
+      setTotalPages(1);
+      setSelectedSportsChannel(null); // Limpiar canal seleccionado al cambiar de pestaña
     }
     // Para anime, usar AnimeAV1; para kdrama y otros, usar TMDB
     else if (type === 'anime') {
@@ -251,7 +263,7 @@ export default function App() {
 
               {/* Nav Tabs Desktop */}
               <nav className="hide-mobile" style={{ display: 'flex', gap: 10 }}>
-                {['movie', 'tv', 'anime', 'kdrama', 'iptv', 'music'].map(t => (
+                {['movie', 'tv', 'anime', 'kdrama', 'iptv', 'events', 'music'].map(t => (
                   <button
                     key={t}
                     className={`tab-btn ${type === t ? 'active' : ''}`}
@@ -261,7 +273,13 @@ export default function App() {
                       setMovies([]);
                     }}
                   >
-                    {t === 'movie' ? 'Películas' : t === 'tv' ? 'Series' : t === 'anime' ? 'Anime' : t === 'kdrama' ? 'K-Drama' : t === 'iptv' ? '📺 TV' : '🎵 Música'}
+                    {t === 'movie' ? 'Películas' : 
+                     t === 'tv' ? 'Series' : 
+                     t === 'anime' ? 'Anime' : 
+                     t === 'kdrama' ? 'K-Drama' : 
+                     t === 'iptv' ? '📺 TV' : 
+                     t === 'events' ? '🏆 Deportes' :
+                     '🎵 Música'}
                   </button>
                 ))}
               </nav>
@@ -275,7 +293,7 @@ export default function App() {
 
           {/* Nav Tabs Mobile (Solo se ve en móvil) */}
           <nav className="show-mobile" style={{ display: 'none', padding: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto', gap: 8 }}>
-            {['movie', 'tv', 'anime', 'kdrama', 'iptv', 'music'].map(t => (
+            {['movie', 'tv', 'anime', 'kdrama', 'iptv', 'events', 'music'].map(t => (
               <button
                 key={t}
                 className={`tab-btn ${type === t ? 'active' : ''}`}
@@ -285,7 +303,13 @@ export default function App() {
                   setMovies([]);
                 }}
               >
-                {t === 'movie' ? '🎬 Películas' : t === 'tv' ? '📺 Series' : t === 'anime' ? '🎌 Anime' : t === 'kdrama' ? '🇰🇷 K-Drama' : t === 'iptv' ? '📺 TV' : '🎵 Música'}
+                {t === 'movie' ? '🎬 Películas' : 
+                 t === 'tv' ? '📺 Series' : 
+                 t === 'anime' ? '🎌 Anime' : 
+                 t === 'kdrama' ? '🇰🇷 K-Drama' : 
+                 t === 'iptv' ? '📺 TV' : 
+                 t === 'events' ? '🏆 Deportes' :
+                 '🎵 Música'}
               </button>
             ))}
           </nav>
@@ -346,6 +370,63 @@ export default function App() {
             <MusicDashboard />
           )}
 
+          {/* ── Vista de Eventos Deportivos con Reproductor P2P ── */}
+          {section === 'trending' && type === 'events' && (
+            <>
+              {/* Reproductor P2P (si hay un canal seleccionado) */}
+              {selectedSportsChannel && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <div style={{ 
+                    background: 'rgba(0, 0, 0, 0.8)', 
+                    padding: '1rem', 
+                    borderRadius: '8px',
+                    marginBottom: '1rem'
+                  }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      marginBottom: '0.5rem'
+                    }}>
+                      <h3 style={{ color: 'white', margin: 0 }}>
+                        {selectedSportsChannel.logo} {selectedSportsChannel.name}
+                      </h3>
+                      <button
+                        onClick={() => setSelectedSportsChannel(null)}
+                        style={{
+                          background: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ✕ Cerrar
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ 
+                    width: '100%', 
+                    aspectRatio: '16/9',
+                    backgroundColor: '#000',
+                    borderRadius: '8px',
+                    overflow: 'hidden'
+                  }}>
+                    <P2PPlayer 
+                      streamUrl={selectedSportsChannel.url}
+                      channelName={selectedSportsChannel.name}
+                      isEmbed={selectedSportsChannel.isEmbed}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {/* Agenda de eventos */}
+              <AgendaView onSelectChannel={setSelectedSportsChannel} />
+            </>
+          )}
+
           {section === 'trending' && type === 'anime' && rows.map((row) => (
             <AnimeRow
               key={`anime-${row.id}`}
@@ -355,7 +436,7 @@ export default function App() {
             />
           ))}
 
-          {section === 'trending' && type !== 'anime' && type !== 'iptv' && type !== 'music' && rows.map((row) => (
+          {section === 'trending' && type !== 'anime' && type !== 'iptv' && type !== 'music' && type !== 'events' && rows.map((row) => (
             <MovieRow
               key={`${type}-${row.id}`}
               title={`${row.emoji} ${row.label}`}

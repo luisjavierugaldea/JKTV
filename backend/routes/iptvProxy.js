@@ -2,8 +2,82 @@ import express from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
 import { reportDeadChannel } from '../scrapers/iptvManager.js';
+import { createContext } from '../scrapers/browserPool.js';
 
 const router = express.Router();
+
+// ── Extractor de streams desde páginas HTML ───────────────────────────────────
+async function extractStreamFromPage(pageUrl) {
+    let context = null;
+    let page = null;
+
+    try {
+        context = await createContext();
+        page = await context.newPage();
+
+        // Interceptar peticiones de red para capturar URLs .m3u8
+        const m3u8Urls = [];
+        page.on('request', (request) => {
+            const url = request.url();
+            if (url.includes('.m3u8') || url.includes('playlist')) {
+                m3u8Urls.push(url);
+            }
+        });
+
+        // Navegar a la página
+        await page.goto(pageUrl, {
+            waitUntil: 'networkidle0',
+            timeout: 15000
+        });
+
+        // Esperar un poco para que cargue el reproductor
+        await page.waitForTimeout(3000);
+
+        // Buscar URLs en el DOM
+        const extractedUrls = await page.evaluate(() => {
+            const urls = [];
+
+            // Buscar en iframes
+            document.querySelectorAll('iframe').forEach(iframe => {
+                if (iframe.src) urls.push(iframe.src);
+            });
+
+            // Buscar en scripts
+            document.querySelectorAll('script').forEach(script => {
+                const content = script.textContent || '';
+                const matches = content.match(/(https?:\/\/[^\s'"]+\.m3u8[^\s'"]*)/gi);
+                if (matches) urls.push(...matches);
+            });
+
+            // Buscar en atributos data-*
+            document.querySelectorAll('[data-src], [data-stream], [data-url]').forEach(el => {
+                const dataSrc = el.getAttribute('data-src') || 
+                               el.getAttribute('data-stream') || 
+                               el.getAttribute('data-url');
+                if (dataSrc) urls.push(dataSrc);
+            });
+
+            return urls;
+        });
+
+        await page.close();
+        await context.close();
+
+        // Combinar URLs y filtrar
+        const allUrls = [...new Set([...m3u8Urls, ...extractedUrls])];
+        const validUrls = allUrls.filter(url => {
+            return url.includes('.m3u8') && url.startsWith('http');
+        });
+
+        return validUrls[0] || null;
+
+    } catch (error) {
+        console.error('[IPTV Proxy] Error extrayendo stream:', error.message);
+        if (page) await page.close().catch(() => {});
+        if (context) await context.close().catch(() => {});
+        return null;
+    }
+}
 
 // ── URL Registry ──────────────────────────────────────────────────────────────
 // Guarda URLs largas → IDs cortos para evitar el error 414 (URI Too Long)
@@ -35,6 +109,55 @@ setInterval(() => {
 
 // ── Headers según el tipo de proveedor ───────────────────────────────────────
 function getHeaders(targetUrl) {
+    // 🏆 CRÍTICO: Dominios deportivos piratas → INYECTAR headers Referer y Origin
+    // Sin estos headers, el CDN devuelve 403 Forbidden
+    const sportsDomainsPattern = [
+        'tvtvhd.com',
+        'fubohd.com', 
+        'rojadirectatv.online',
+        'rojadirecta.me',
+        'sportshd.me',
+        'pirlotv',
+        'futbollibre',
+        'librefutbol',
+        'librestream',
+        'sportsonline',
+        'vercanalestv',
+        'elnacional.com',
+        'latele.tv'
+    ];
+    
+    // Detectar si el dominio es de deportes piratas
+    const isSportsDomain = sportsDomainsPattern.some(domain => targetUrl.includes(domain));
+    
+    // También detectar CDNs comunes de streams piratas
+    const isPirateStreamCDN = targetUrl.includes('.m3u8') && (
+        targetUrl.includes('cdn') ||
+        targetUrl.includes('stream') ||
+        targetUrl.includes('live') ||
+        targetUrl.includes('hls') ||
+        targetUrl.includes('.lat') ||
+        targetUrl.includes('.online') ||
+        targetUrl.includes('.me')
+    );
+    
+    if (isSportsDomain || isPirateStreamCDN) {
+        console.log('[IPTV Proxy] 🔒 Inyectando headers anti-403 para:', targetUrl.substring(0, 50) + '...');
+        return {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Referer': 'https://tvtvhd.com/',
+            'Origin': 'https://tvtvhd.com',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'cross-site',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+        };
+    }
     // Samsung TV Plus / jmp2.uk → Simular Tizen TV
     if (targetUrl.includes('jmp2.uk') || targetUrl.includes('samsung')) {
         return {
@@ -93,6 +216,19 @@ router.get('/stream', async (req, res) => {
 // ── Función principal de proxy ────────────────────────────────────────────────
 async function proxyUrl(targetUrl, channelId, req, res) {
     try {
+        // 🔍 Detectar si es una página HTML de canales (tvtvhd.com/canales.php)
+        if (targetUrl.includes('canales.php') || targetUrl.includes('/vivo/')) {
+            console.log('[IPTV Proxy] 🔍 Detectada página HTML, extrayendo stream...');
+            const extractedUrl = await extractStreamFromPage(targetUrl);
+            
+            if (extractedUrl) {
+                console.log('[IPTV Proxy] ✅ Stream extraído:', extractedUrl);
+                targetUrl = extractedUrl; // Usar la URL extraída
+            } else {
+                console.log('[IPTV Proxy] ⚠️ No se pudo extraer stream, intentando con URL original');
+            }
+        }
+
         const response = await axios({
             method: 'get',
             url: targetUrl,

@@ -37,6 +37,8 @@ import torrentProxyRouter from './routes/torrentProxy.js';
 import iptvRouter from './routes/iptv.js';
 import iptvProxyRouter from './routes/iptvProxy.js';
 import musicRouter from './routes/music.js';
+import eventsRouter from './routes/events.js';
+import channelsRouter from './routes/channels.js';
 
 // Browser pool (para cierre limpio en shutdown)
 import { closeBrowser } from './scrapers/browserPool.js';
@@ -144,6 +146,8 @@ app.use('/api/torrent', torrentProxyRouter);
 app.use('/api/iptv', iptvRouter);
 app.use('/api/iptv-proxy', iptvProxyRouter);
 app.use('/api/music', musicRouter);
+app.use('/api/events', eventsRouter);
+app.use('/api/channels', channelsRouter);
 
 // Ruta de fallback para endpoints no existentes
 app.use((_req, res) => {

@@ -401,7 +401,9 @@ const TVView = ({ onSelectChannel }) => {
                 color: '#9ca3af',
                 flexWrap: 'wrap',
               }}>
-                <span>🟢 {channel.quality || 'HD'}</span>
+                🟢 {channel.quality === 4 ? '4K' :
+    channel.quality === 3 ? '1080p' :
+    channel.quality === 2 ? '720p' : 'SD'}
                 <span>• {channel.language?.toUpperCase() || 'ES'}</span>
                 {channel.source && (
                   <span>• 📡 {channel.source}</span>

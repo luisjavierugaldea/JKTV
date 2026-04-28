@@ -12,6 +12,8 @@ import MusicDashboard from './components/MusicDashboard';
 import GlobalAudioPlayer from './components/GlobalAudioPlayer';
 import AgendaView from './components/AgendaView';
 import P2PPlayer from './components/P2PPlayer';
+import TVPlayer from './components/TVPlayer';
+import TVView from './components/TVView';
 import { MusicProvider } from './context/MusicContext';
 import { tmdb, anime as animeApi, iptv } from './lib/api';
 
@@ -88,6 +90,9 @@ export default function App() {
   
   // ── Estado para eventos deportivos y reproductor P2P ──────────────────────
   const [selectedSportsChannel, setSelectedSportsChannel] = useState(null);
+  
+  // ── Estado para canales de TV agregados ──────────────────────────────────
+  const [selectedTVChannel, setSelectedTVChannel] = useState(null);
 
   // ── Cargar hero banner desde trending ───────────────────────────────────────
   useEffect(() => {
@@ -115,6 +120,13 @@ export default function App() {
       setHeroBg(null);
       setTotalPages(1);
       setSelectedSportsChannel(null); // Limpiar canal seleccionado al cambiar de pestaña
+    }
+    // Para iptv (canales agregados), se maneja con TVView - no pre-cargar
+    else if (type === 'iptv') {
+      setMovies([]);
+      setHeroBg(null);
+      setTotalPages(1);
+      setSelectedTVChannel(null); // Limpiar canal seleccionado al cambiar de pestaña
     }
     // Para anime, usar AnimeAV1; para kdrama y otros, usar TMDB
     else if (type === 'anime') {
@@ -353,17 +365,68 @@ export default function App() {
           )}
 
           {/* ── TRENDING: filas por categoría ── */}
-          {section === 'trending' && (type === 'movie' || type === 'tv' || type === 'anime' || type === 'kdrama') && (
+          {section === 'trending' && (type === 'movie' || type === 'anime' || type === 'kdrama') && (
             <LocalWatchHistory onMovieClick={openMovie} />
           )}
 
+          {/* ── Vista de Canales TV Agregados (IPTV) ── */}
           {section === 'trending' && type === 'iptv' && (
-            <IptvDashboard
-              channels={movies}
-              loading={loading}
-              error={error}
-              onRemoveChannel={(id) => setMovies(prev => prev.filter(c => c.id !== id))}
-            />
+            <>
+              {/* Reproductor de TV (si hay un canal seleccionado) */}
+              {selectedTVChannel ? (
+                <div style={{ marginBottom: '2rem', maxWidth: '1400px', margin: '0 auto', padding: 'clamp(1rem, 3vw, 2rem)' }}>
+                  <button
+                    onClick={() => setSelectedTVChannel(null)}
+                    style={{
+                      marginBottom: '1rem',
+                      padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem)',
+                      background: '#3b82f6',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: 'clamp(0.9rem, 2.5vw, 1rem)',
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                      transition: 'all 0.3s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
+                  >
+                    ⬅️ Volver a Canales
+                  </button>
+                  
+                  <div style={{ 
+                    background: 'rgba(0, 0, 0, 0.8)', 
+                    padding: 'clamp(0.75rem, 2vw, 1rem)', 
+                    borderRadius: '8px',
+                    marginBottom: '1rem'
+                  }}>
+                    <h3 style={{ color: 'white', margin: 0, fontSize: 'clamp(1.1rem, 3vw, 1.5rem)' }}>
+                      📺 {selectedTVChannel.name}
+                    </h3>
+                  </div>
+                  
+                  <div style={{ 
+                    width: '100%', 
+                    aspectRatio: '16/9',
+                    backgroundColor: '#000',
+                    borderRadius: '8px',
+                    overflow: 'hidden'
+                  }}>
+                    <TVPlayer 
+                      streamUrl={selectedTVChannel.url}
+                      channelName={selectedTVChannel.name}
+                      isEmbed={selectedTVChannel.isEmbed}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <TVView onSelectChannel={setSelectedTVChannel} />
+              )}
+            </>
+          )}
+
+          {/* ── Vista de 
           )}
 
           {section === 'trending' && type === 'music' && (
@@ -372,7 +435,7 @@ export default function App() {
 
           {/* ── Vista de Eventos Deportivos con Reproductor P2P ── */}
           {section === 'trending' && type === 'events' && (
-            <>
+            <> 
               {/* Reproductor P2P (si hay un canal seleccionado) */}
               {selectedSportsChannel && (
                 <div style={{ marginBottom: '2rem' }}>

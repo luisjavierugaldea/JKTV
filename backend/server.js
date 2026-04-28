@@ -39,9 +39,14 @@ import iptvProxyRouter from './routes/iptvProxy.js';
 import musicRouter from './routes/music.js';
 import eventsRouter from './routes/events.js';
 import channelsRouter from './routes/channels.js';
+import tvRouter from './routes/tv.js';
+import otaRouter from './routes/ota.js';
 
 // Browser pool (para cierre limpio en shutdown)
 import { closeBrowser } from './scrapers/browserPool.js';
+
+// Agregador de contenido IPTV
+import aggregator from './core/aggregator.js';
 
 // ─── Liberar puerto si está ocupado (Solo para Windows/Desarrollo) ────────────
 function freePort(port, maxRetries = 3) {
@@ -148,6 +153,8 @@ app.use('/api/iptv-proxy', iptvProxyRouter);
 app.use('/api/music', musicRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/channels', channelsRouter);
+app.use('/api/tv', tvRouter);            // Nueva sección TV agregada
+app.use('/app', otaRouter);              // Sistema OTA
 
 // Ruta de fallback para endpoints no existentes
 app.use((_req, res) => {
@@ -184,6 +191,11 @@ async function startServer(isRetry = false) {
       console.log(`\n    ✅  Servidor listo. Esperando peticiones...\n`);
 
       console.log('    🎬  Motor FFmpeg listo y conectado al sistema\n');
+
+      // Inicializar agregador de contenido IPTV
+      aggregator.initialize().catch(err => {
+        console.error('❌  Error inicializando agregador:', err);
+      });
     });
 
     server.on('error', async (err) => {

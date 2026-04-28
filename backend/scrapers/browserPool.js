@@ -117,6 +117,8 @@ export async function createContext() {
     deviceScaleFactor: 1,
     // Deshabilitar WebRTC para evitar fuga de IP real
     permissions: [],
+    // IMPORTANTE: Deshabilitar descargas para evitar archivos en C:\tmp
+    acceptDownloads: false,
     extraHTTPHeaders: {
       'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
       'Accept-Encoding': 'gzip, deflate, br',

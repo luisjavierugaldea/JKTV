@@ -1,0 +1,6 @@
+# Ignorar APKs (archivos muy pesados)
+*.apk
+*.aab
+
+# Pero mantener la carpeta
+!.gitignore

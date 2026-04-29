@@ -14,6 +14,7 @@ import AgendaView from './components/AgendaView';
 import P2PPlayer from './components/P2PPlayer';
 import TVPlayer from './components/TVPlayer';
 import TVView from './components/TVView';
+import UpdateNotifier from './components/UpdateNotifier';
 import { MusicProvider } from './context/MusicContext';
 import { tmdb, anime as animeApi, iptv } from './lib/api';
 
@@ -536,6 +537,9 @@ export default function App() {
           />
         ) : null}
         <GlobalAudioPlayer />
+        
+        {/* Sistema de notificación de actualizaciones */}
+        <UpdateNotifier />
       </div>
     </MusicProvider>
   );

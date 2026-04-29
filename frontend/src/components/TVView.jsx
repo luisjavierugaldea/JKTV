@@ -61,6 +61,67 @@ const TVView = ({ onSelectChannel }) => {
     applyFilters();
   }, [channels, selectedCategory, selectedCountry, searchQuery]);
 
+  // 🎬 AGRUPAR CANALES EN SECCIONES (tipo Netflix)
+  const buildSections = () => {
+    const sections = [
+      {
+        id: 'live',
+        title: '🔴 En Vivo Ahora',
+        channels: channels.filter(c => c.isAlive !== false).slice(0, 20)
+      },
+      {
+        id: 'sports',
+        title: '⚽ Deportes',
+        channels: channels.filter(c => 
+          c.category === 'sports' || 
+          c.name.toLowerCase().includes('espn') ||
+          c.name.toLowerCase().includes('fox sports') ||
+          c.name.toLowerCase().includes('tudn')
+        ).slice(0, 20)
+      },
+      {
+        id: 'movies',
+        title: '🎬 Películas 24/7',
+        channels: channels.filter(c => 
+          c.category === 'movies' || 
+          c.category === 'entertainment' ||
+          c.name.toLowerCase().includes('cine') ||
+          c.name.toLowerCase().includes('movies') ||
+          c.name.toLowerCase().includes('hbo') ||
+          c.name.toLowerCase().includes('paramount')
+        ).slice(0, 20)
+      },
+      {
+        id: 'latam',
+        title: '🌎 LATAM',
+        channels: channels.filter(c => 
+          ['MX', 'CO', 'AR', 'CL', 'PE', 'VE', 'EC', 'UY', 'mexico', 'colombia', 'argentina', 'chile', 'peru'].includes(c.country?.toLowerCase())
+        ).slice(0, 20)
+      },
+      {
+        id: 'news',
+        title: '📰 Noticias',
+        channels: channels.filter(c => 
+          c.category === 'news' ||
+          c.name.toLowerCase().includes('news') ||
+          c.name.toLowerCase().includes('noticias') ||
+          c.name.toLowerCase().includes('cnn') ||
+          c.name.toLowerCase().includes('bbc')
+        ).slice(0, 20)
+      },
+      {
+        id: 'premium',
+        title: '⭐ Premium HD/4K',
+        channels: channels.filter(c => 
+          c.quality === '4K' || c.quality === '1080p' || c.quality === 'HD'
+        ).slice(0, 20)
+      },
+    ];
+
+    // Filtrar secciones vacías
+    return sections.filter(section => section.channels.length > 0);
+  };
+
   const fetchChannels = async () => {
     setLoading(true);
     setError(null);
@@ -181,6 +242,208 @@ const TVView = ({ onSelectChannel }) => {
       console.error('Error refreshing:', err);
     }
   };
+
+  // 🎨 RENDERIZAR FILA HORIZONTAL DE CANALES (tipo Netflix)
+  const renderChannelRow = (section) => {
+    return (
+      <div key={section.id} style={{ marginBottom: '2rem' }}>
+        {/* Título de la sección */}
+        <h3 style={{
+          fontSize: 'clamp(1.2rem, 3vw, 1.5rem)',
+          fontWeight: '700',
+          color: '#fff',
+          marginBottom: '1rem',
+          paddingLeft: '0.5rem',
+        }}>
+          {section.title}
+        </h3>
+
+        {/* Scroll horizontal de canales */}
+        <div style={{
+          display: 'flex',
+          gap: 'clamp(0.75rem, 2vw, 1rem)',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          paddingBottom: '1rem',
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#374151 transparent',
+          WebkitOverflowScrolling: 'touch',
+        }}>
+          {section.channels.map((channel, index) => {
+            const isSelected = multiMode && selectedChannels.some(ch => ch.id === channel.id);
+            const selectionIndex = isSelected 
+              ? selectedChannels.findIndex(ch => ch.id === channel.id) + 1 
+              : -1;
+            const isMaxReached = multiMode && selectedChannels.length >= 4 && !isSelected;
+
+            return (
+              <button
+                key={`${section.id}_${channel.id}_${index}`}
+                onClick={() => handleSelectChannel(channel)}
+                disabled={isMaxReached}
+                style={{
+                  minWidth: 'clamp(180px, 35vw, 260px)',
+                  maxWidth: 'clamp(180px, 35vw, 260px)',
+                  background: isSelected
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                    : 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+                  border: isSelected 
+                    ? '3px solid #60a5fa'
+                    : '2px solid #374151',
+                  borderRadius: '12px',
+                  padding: 'clamp(0.75rem, 3vw, 1rem)',
+                  cursor: isMaxReached ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s',
+                  color: '#fff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  alignItems: 'flex-start',
+                  textAlign: 'left',
+                  position: 'relative',
+                  opacity: isMaxReached ? 0.5 : 1,
+                  boxShadow: isSelected ? '0 8px 24px rgba(59, 130, 246, 0.5)' : 'none',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isMaxReached) {
+                    e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+                    e.currentTarget.style.borderColor = isSelected ? '#60a5fa' : '#3b82f6';
+                    e.currentTarget.style.boxShadow = isSelected
+                      ? '0 12px 32px rgba(59, 130, 246, 0.6)'
+                      : '0 8px 16px rgba(59, 130, 246, 0.3)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.borderColor = isSelected ? '#60a5fa' : '#374151';
+                  e.currentTarget.style.boxShadow = isSelected 
+                    ? '0 8px 24px rgba(59, 130, 246, 0.5)'
+                    : 'none';
+                }}
+              >
+                {/* Badge de selección */}
+                {isSelected && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '-8px',
+                    right: '-8px',
+                    background: '#10b981',
+                    color: '#fff',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    border: '3px solid #1f2937',
+                    boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                  }}>
+                    {selectionIndex}
+                  </div>
+                )}
+
+                {/* Badge de máximo alcanzado */}
+                {isMaxReached && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '0.5rem',
+                    right: '0.5rem',
+                    background: 'rgba(239, 68, 68, 0.9)',
+                    color: '#fff',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '6px',
+                    fontSize: '0.7rem',
+                    fontWeight: '600',
+                  }}>
+                    ⚠️ Máx 4
+                  </div>
+                )}
+
+                <div style={{
+                  fontSize: 'clamp(0.95rem, 3vw, 1.05rem)',
+                  fontWeight: '600',
+                  width: '100%',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {channel.name}
+                </div>
+                
+                <div style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  fontSize: 'clamp(0.7rem, 2.2vw, 0.8rem)',
+                  color: isSelected ? '#e0e7ff' : '#9ca3af',
+                  flexWrap: 'wrap',
+                }}>
+                  {channel.quality && (
+                    <>
+                      {channel.quality === '4K' && '🔵'}
+                      {channel.quality === '1080p' && '🟢'}
+                      {channel.quality === 'HD' && '🟡'}
+                      {channel.quality === 'SD' && '⚪'}
+                      {' '}{channel.quality}
+                    </>
+                  )}
+                  <span>• {channel.language?.toUpperCase() || 'ES'}</span>
+                  {channel.isAlive !== undefined && (
+                    <span>• {channel.isAlive ? '✅' : '⚠️'}</span>
+                  )}
+                </div>
+
+                {/* Indicador de modo MultiView */}
+                {multiMode && !isSelected && !isMaxReached && (
+                  <div style={{
+                    fontSize: '0.7rem',
+                    color: '#60a5fa',
+                    marginTop: '0.25rem',
+                  }}>
+                    👆 Click para agregar
+                  </div>
+                )}
+                {multiMode && isSelected && (
+                  <div style={{
+                    fontSize: '0.7rem',
+                    color: '#34d399',
+                    marginTop: '0.25rem',
+                    fontWeight: '600',
+                  }}>
+                    ✅ Seleccionado
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Ocultar scrollbar en webkit */}
+        <style>
+          {`
+            div::-webkit-scrollbar {
+              height: 6px;
+            }
+            div::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            div::-webkit-scrollbar-thumb {
+              background: #374151;
+              border-radius: 10px;
+            }
+            div::-webkit-scrollbar-thumb:hover {
+              background: #4b5563;
+            }
+          `}
+        </style>
+      </div>
+    );
+  };
+
+  // Detectar si hay filtros activos
+  const hasActiveFilters = searchQuery.trim() !== '' || selectedCategory !== 'all' || selectedCountry !== 'all';
 
   if (loading) {
     return (
@@ -471,171 +734,181 @@ const TVView = ({ onSelectChannel }) => {
         </div>
       </div>
 
-      {/* Grid de canales */}
-      {filteredChannels.length === 0 ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '3rem',
-          color: '#9ca3af',
-          fontSize: '1.1rem',
-        }}>
-          📭 No se encontraron canales con esos filtros
-        </div>
+      {/* MODO FILTROS/BÚSQUEDA: Mostrar GRID */}
+      {hasActiveFilters ? (
+        <>
+          {/* Grid de canales (CÓDIGO ORIGINAL) */}
+          {filteredChannels.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '3rem',
+              color: '#9ca3af',
+              fontSize: '1.1rem',
+            }}>
+              📭 No se encontraron canales con esos filtros
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(160px, 45vw, 280px), 1fr))',
+              gap: 'clamp(0.75rem, 2vw, 1rem)',
+            }}>
+              {filteredChannels.map((channel, index) => {
+                const isSelected = multiMode && selectedChannels.some(ch => ch.id === channel.id);
+                const selectionIndex = isSelected 
+                  ? selectedChannels.findIndex(ch => ch.id === channel.id) + 1 
+                  : -1;
+                const isMaxReached = multiMode && selectedChannels.length >= 4 && !isSelected;
+
+                return (
+                  <button
+                    key={`${channel.id}_${index}`}
+                    onClick={() => handleSelectChannel(channel)}
+                    disabled={isMaxReached}
+                    style={{
+                      background: isSelected
+                        ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                        : 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+                      border: isSelected 
+                        ? '3px solid #60a5fa'
+                        : '2px solid #374151',
+                      borderRadius: '12px',
+                      padding: 'clamp(0.75rem, 3vw, 1rem)',
+                      cursor: isMaxReached ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.3s',
+                      color: '#fff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      alignItems: 'flex-start',
+                      textAlign: 'left',
+                      position: 'relative',
+                      opacity: isMaxReached ? 0.5 : 1,
+                      boxShadow: isSelected ? '0 8px 24px rgba(59, 130, 246, 0.5)' : 'none',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isMaxReached) {
+                        e.currentTarget.style.transform = 'scale(1.03)';
+                        e.currentTarget.style.borderColor = isSelected ? '#60a5fa' : '#3b82f6';
+                        e.currentTarget.style.boxShadow = isSelected
+                          ? '0 12px 32px rgba(59, 130, 246, 0.6)'
+                          : '0 8px 16px rgba(59, 130, 246, 0.3)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.borderColor = isSelected ? '#60a5fa' : '#374151';
+                      e.currentTarget.style.boxShadow = isSelected 
+                        ? '0 8px 24px rgba(59, 130, 246, 0.5)'
+                        : 'none';
+                    }}
+                  >
+                    {/* Badge de selección */}
+                    {isSelected && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '-8px',
+                        right: '-8px',
+                        background: '#10b981',
+                        color: '#fff',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.85rem',
+                        fontWeight: '700',
+                        border: '3px solid #1f2937',
+                        boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                      }}>
+                        {selectionIndex}
+                      </div>
+                    )}
+
+                    {/* Badge de máximo alcanzado */}
+                    {isMaxReached && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '0.5rem',
+                        right: '0.5rem',
+                        background: 'rgba(239, 68, 68, 0.9)',
+                        color: '#fff',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '6px',
+                        fontSize: '0.7rem',
+                        fontWeight: '600',
+                      }}>
+                        ⚠️ Máx 4
+                      </div>
+                    )}
+
+                    <div style={{
+                      fontSize: 'clamp(1rem, 3.5vw, 1.1rem)',
+                      fontWeight: '600',
+                      width: '100%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {channel.name}
+                    </div>
+                    
+                    <div style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)',
+                      color: isSelected ? '#e0e7ff' : '#9ca3af',
+                      flexWrap: 'wrap',
+                    }}>
+                      {channel.quality && (
+                        <>
+                          {channel.quality === '4K' && '🔵'}
+                          {channel.quality === '1080p' && '🟢'}
+                          {channel.quality === 'HD' && '🟡'}
+                          {channel.quality === 'SD' && '⚪'}
+                          {' '}{channel.quality}
+                        </>
+                      )}
+                      <span>• {channel.language?.toUpperCase() || 'ES'}</span>
+                      {channel.source && (
+                        <span>• 📡 {channel.source}</span>
+                      )}
+                      {channel.isAlive !== undefined && (
+                        <span>• {channel.isAlive ? '✅ Live' : '⚠️'}</span>
+                      )}
+                    </div>
+
+                    {/* Indicador de modo MultiView */}
+                    {multiMode && !isSelected && !isMaxReached && (
+                      <div style={{
+                        fontSize: '0.75rem',
+                        color: '#60a5fa',
+                        marginTop: '0.25rem',
+                      }}>
+                        👆 Click para agregar
+                      </div>
+                    )}
+                    {multiMode && isSelected && (
+                      <div style={{
+                        fontSize: '0.75rem',
+                        color: '#34d399',
+                        marginTop: '0.25rem',
+                        fontWeight: '600',
+                      }}>
+                        ✅ Seleccionado
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </>
       ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(160px, 45vw, 280px), 1fr))',
-          gap: 'clamp(0.75rem, 2vw, 1rem)',
-        }}>
-          {filteredChannels.map((channel, index) => {
-            const isSelected = multiMode && selectedChannels.some(ch => ch.id === channel.id);
-            const selectionIndex = isSelected 
-              ? selectedChannels.findIndex(ch => ch.id === channel.id) + 1 
-              : -1;
-            const isMaxReached = multiMode && selectedChannels.length >= 4 && !isSelected;
-
-            return (
-              <button
-                key={`${channel.id}_${index}`}
-                onClick={() => handleSelectChannel(channel)}
-                disabled={isMaxReached}
-                style={{
-                  background: isSelected
-                    ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-                    : 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
-                  border: isSelected 
-                    ? '3px solid #60a5fa'
-                    : '2px solid #374151',
-                  borderRadius: '12px',
-                  padding: 'clamp(0.75rem, 3vw, 1rem)',
-                  cursor: isMaxReached ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s',
-                  color: '#fff',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                  alignItems: 'flex-start',
-                  textAlign: 'left',
-                  position: 'relative',
-                  opacity: isMaxReached ? 0.5 : 1,
-                  boxShadow: isSelected ? '0 8px 24px rgba(59, 130, 246, 0.5)' : 'none',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isMaxReached) {
-                    e.currentTarget.style.transform = 'scale(1.03)';
-                    e.currentTarget.style.borderColor = isSelected ? '#60a5fa' : '#3b82f6';
-                    e.currentTarget.style.boxShadow = isSelected
-                      ? '0 12px 32px rgba(59, 130, 246, 0.6)'
-                      : '0 8px 16px rgba(59, 130, 246, 0.3)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.borderColor = isSelected ? '#60a5fa' : '#374151';
-                  e.currentTarget.style.boxShadow = isSelected 
-                    ? '0 8px 24px rgba(59, 130, 246, 0.5)'
-                    : 'none';
-                }}
-              >
-                {/* Badge de selección */}
-                {isSelected && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '-8px',
-                    right: '-8px',
-                    background: '#10b981',
-                    color: '#fff',
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.85rem',
-                    fontWeight: '700',
-                    border: '3px solid #1f2937',
-                    boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-                  }}>
-                    {selectionIndex}
-                  </div>
-                )}
-
-                {/* Badge de máximo alcanzado */}
-                {isMaxReached && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '0.5rem',
-                    right: '0.5rem',
-                    background: 'rgba(239, 68, 68, 0.9)',
-                    color: '#fff',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '6px',
-                    fontSize: '0.7rem',
-                    fontWeight: '600',
-                  }}>
-                    ⚠️ Máx 4
-                  </div>
-                )}
-
-                <div style={{
-                  fontSize: 'clamp(1rem, 3.5vw, 1.1rem)',
-                  fontWeight: '600',
-                  width: '100%',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}>
-                  {channel.name}
-                </div>
-                
-                <div style={{
-                  display: 'flex',
-                  gap: '0.5rem',
-                  fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)',
-                  color: isSelected ? '#e0e7ff' : '#9ca3af',
-                  flexWrap: 'wrap',
-                }}>
-                  {channel.quality && (
-                    <>
-                      {channel.quality === '4K' && '🔵'}
-                      {channel.quality === '1080p' && '🟢'}
-                      {channel.quality === 'HD' && '🟡'}
-                      {channel.quality === 'SD' && '⚪'}
-                      {' '}{channel.quality}
-                    </>
-                  )}
-                  <span>• {channel.language?.toUpperCase() || 'ES'}</span>
-                  {channel.source && (
-                    <span>• 📡 {channel.source}</span>
-                  )}
-                  {channel.isAlive !== undefined && (
-                    <span>• {channel.isAlive ? '✅ Live' : '⚠️'}</span>
-                  )}
-                </div>
-
-                {/* Indicador de modo MultiView */}
-                {multiMode && !isSelected && !isMaxReached && (
-                  <div style={{
-                    fontSize: '0.75rem',
-                    color: '#60a5fa',
-                    marginTop: '0.25rem',
-                  }}>
-                    👆 Click para agregar
-                  </div>
-                )}
-                {multiMode && isSelected && (
-                  <div style={{
-                    fontSize: '0.75rem',
-                    color: '#34d399',
-                    marginTop: '0.25rem',
-                    fontWeight: '600',
-                  }}>
-                    ✅ Seleccionado
-                  </div>
-                )}
-              </button>
-            );
-          })}
+        /* MODO EXPLORACIÓN: Mostrar ROWS (tipo Netflix) */
+        <div>
+          {buildSections().map(section => renderChannelRow(section))}
         </div>
       )}
     </div>

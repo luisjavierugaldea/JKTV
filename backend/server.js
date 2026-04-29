@@ -41,6 +41,7 @@ import eventsRouter from './routes/events.js';
 import channelsRouter from './routes/channels.js';
 import tvRouter from './routes/tv.js';
 import otaRouter from './routes/ota.js';
+import appVersionRouter from './routes/appVersion.js';
 
 // Browser pool (para cierre limpio en shutdown)
 import { closeBrowser } from './scrapers/browserPool.js';
@@ -155,6 +156,7 @@ app.use('/api/events', eventsRouter);
 app.use('/api/channels', channelsRouter);
 app.use('/api/tv', tvRouter);            // Nueva sección TV agregada
 app.use('/app', otaRouter);              // Sistema OTA
+app.use('/api/app-version', appVersionRouter); // Info de versión para actualizaciones
 
 // Ruta de fallback para endpoints no existentes
 app.use((_req, res) => {

@@ -191,6 +191,16 @@ const MultiPlayer = ({ channels, onClose }) => {
       <div
         key={`video-${channel.url}-${index}`}
         onClick={() => handleClick(index)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleClick(index);
+          }
+        }}
+        onFocus={() => handleClick(index)}
+        tabIndex={index + 1}
+        role="button"
+        aria-label={`Canal ${index + 1}: ${channel.name}`}
         style={{
           position: 'relative',
           width: '100%',
@@ -199,7 +209,8 @@ const MultiPlayer = ({ channels, onClose }) => {
           borderRadius: isMain ? '12px' : '8px',
           overflow: 'hidden',
           border: isActive ? '3px solid #10b981' : '2px solid #333',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          outline: 'none'
         }}
       >
         {channel.isEmbed ? (
@@ -266,21 +277,43 @@ const MultiPlayer = ({ channels, onClose }) => {
       position: 'absolute',
       top: 10,
       right: 10,
-      zIndex: 1000
+      zIndex: 1000,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
+      alignItems: 'flex-end'
     }}>
       <button
         onClick={onClose}
+        tabIndex={10}
         style={{
           background: '#ef4444',
           color: '#fff',
           border: 'none',
           padding: '10px 20px',
           borderRadius: '8px',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          fontWeight: '600',
+          fontSize: '0.9rem'
         }}
       >
         ❌ Cerrar
       </button>
+      
+      {/* Ayuda de navegación */}
+      <div style={{
+        background: 'rgba(0,0,0,0.8)',
+        color: '#fff',
+        padding: '8px 12px',
+        borderRadius: '8px',
+        fontSize: '0.75rem',
+        backdropFilter: 'blur(10px)',
+        maxWidth: '220px',
+        textAlign: 'right'
+      }}>
+        <div>🎮 Tab / ←→ : Cambiar canal</div>
+        <div>🔊 Click / Enter: Cambiar audio</div>
+      </div>
     </div>
   )
 

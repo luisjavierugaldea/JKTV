@@ -18,7 +18,7 @@ router.get('/', (req, res) => {
       buildNumber: 1, // Incrementa con cada build
       
       // 🎯 OPCIÓN 1 (RECOMENDADA): GitHub Releases - Descarga directa automática
-      downloadUrl: 'https://github.com/luisjavierugaldea/JKTV/releases/download/v1.0.0/app-release.apk',
+      downloadUrl: 'https://github.com/luisjavierugaldea/JKTV/releases/download/v1.0.0/app-debug.apk',
       
       // 🎯 OPCIÓN 2: Firebase Storage
       // downloadUrl: 'https://firebasestorage.googleapis.com/v0/b/tu-proyecto.appspot.com/o/apk%2Fapp-release.apk?alt=media',

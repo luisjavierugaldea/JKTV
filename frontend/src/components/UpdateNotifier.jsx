@@ -23,6 +23,13 @@ const UpdateNotifier = () => {
 
   const checkForUpdates = async () => {
     try {
+      // 🌐 Solo funciona en APK, no en web
+      const isCapacitor = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+      if (!isCapacitor) {
+        console.log('🌐 UpdateNotifier deshabilitado: Solo funciona en APK Android');
+        return;
+      }
+
       const response = await fetch(`${API_BASE_URL}/app-version`);
       if (!response.ok) return;
 

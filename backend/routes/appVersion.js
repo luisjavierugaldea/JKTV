@@ -14,11 +14,11 @@ const __dirname = path.dirname(__filename);
 router.get('/', (req, res) => {
   try {
     const versionInfo = {
-      version: '1.0.1', // 👈 ACTUALIZA ESTO cuando subas nueva versión
-      buildNumber: 1, // Incrementa con cada build
+      version: '1.0.2', // 👈 ACTUALIZA ESTO cuando subas nueva versión
+      buildNumber: 2, // Incrementa con cada build
       
       // 🎯 OPCIÓN 1 (RECOMENDADA): GitHub Releases - Descarga directa automática
-      downloadUrl: 'https://github.com/luisjavierugaldea/JKTV/releases/download/v1.0.1/app-debug.apk',
+      downloadUrl: 'https://github.com/luisjavierugaldea/JKTV/releases/download/v1.0.1/app-debug.apk', // 👈 Temporalmente apunta a v1.0.1 para probar
       
       // 🎯 OPCIÓN 2: Firebase Storage
       // downloadUrl: 'https://firebasestorage.googleapis.com/v0/b/tu-proyecto.appspot.com/o/apk%2Fapp-release.apk?alt=media',

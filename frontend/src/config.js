@@ -10,7 +10,7 @@
  */
 
 // 🎯 CAMBIA AQUÍ ANTES DE COMPILAR
-const MODE = 'apk';
+const MODE = 'apk'; // 👈 Laptop como servidor local para APK
 
 // IP de tu PC en la red WiFi (solo necesaria para MODE='apk')
 // Mírala con: ipconfig → Adaptador WiFi → Dirección IPv4
@@ -28,11 +28,6 @@ const config = {
     // El celular necesita conectarse al mismo WiFi que tu PC
     backendURL: `http://${PC_IP}:3001/api`,
     description: `APK Local — Backend en ${PC_IP}`,
-  },
-  prod: {
-    // Backend desplegado en Railway (accesible desde internet)
-    backendURL: 'https://jktv-production.up.railway.app/api',
-    description: 'Producción — Backend',
   },
 };
 

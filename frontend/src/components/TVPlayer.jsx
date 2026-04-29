@@ -245,6 +245,8 @@ const TVPlayer = ({ streamUrl, channelName, isEmbed = false }) => {
         ref={videoRef}
         controls
         autoPlay
+        playsInline
+        preload="auto"
         style={{
           width: '100%',
           height: '100%',

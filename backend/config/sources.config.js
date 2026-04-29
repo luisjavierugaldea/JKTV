@@ -6,11 +6,18 @@
 // URLs de listas M3U públicas (LATAM enfocadas)
 export const M3U_SOURCES = [
   {
+    id: 'iptv-org-global',
+    name: 'IPTV.org Global (Filtrado)',
+    url: 'https://iptv-org.github.io/iptv/index.m3u',
+    enabled: true,
+    priority: 1,
+  },
+  {
     id: 'iptv-org-latam',
     name: 'IPTV.org LATAM',
     url: 'https://iptv-org.github.io/iptv/countries/mx.m3u',
     enabled: true,
-    priority: 1,
+    priority: 2,
   },
   {
     id: 'iptv-org-co',

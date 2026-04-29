@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 import ChannelsView from './ChannelsView';
+import MultiPlayer from './MultiPlayer';
 
 export default function AgendaView({ onSelectChannel }) {
   const [activeTab, setActiveTab] = useState('events'); // 'events' o 'channels'
@@ -18,6 +19,11 @@ export default function AgendaView({ onSelectChannel }) {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedEvent, setExpandedEvent] = useState(null);
+
+  // MultiView
+  const [multiMode, setMultiMode] = useState(false);
+  const [selectedChannels, setSelectedChannels] = useState([]);
+  const [showMultiPlayer, setShowMultiPlayer] = useState(false);
 
   // Cargar eventos desde el backend
   const fetchEvents = useCallback(async () => {
@@ -54,21 +60,62 @@ export default function AgendaView({ onSelectChannel }) {
 
   // Manejar selección de canal
   const handleSelectChannel = (event, canal) => {
-    console.log('[AgendaView] 📺 Canal seleccionado:', canal.nombre, '→', canal.url);
-    
-    // USAR URL DIRECTA de tvtvhd.com (embed iframe)
-    // El canal ya tiene la URL correcta: https://tvtvhd.com/vivo/canales.php?stream=espn
-    onSelectChannel({
+    // Modo normal: selección única
+    if (!multiMode) {
+      console.log('[AgendaView] 📺 Canal seleccionado:', canal.nombre, '→', canal.url);
+      
+      onSelectChannel({
+        name: `${event.titulo} - ${canal.nombre}`,
+        url: canal.url,
+        logo: event.logo,
+        isEmbed: true
+      });
+      
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
+      return;
+    }
+
+    // Modo MultiView: selección múltiple (máx 4)
+    const channelData = {
+      id: `${event.id}_${canal.nombre}`,
       name: `${event.titulo} - ${canal.nombre}`,
-      url: canal.url,  // URL directa de tvtvhd.com
+      url: canal.url,
       logo: event.logo,
-      isEmbed: true    // Reproducir en iframe (tvtvhd.com maneja tokens internamente)
-    });
-    
-    // Scroll suave hacia arriba para ver el reproductor
-    setTimeout(() => {
+      isEmbed: true
+    };
+
+    const isAlreadySelected = selectedChannels.some(ch => ch.id === channelData.id);
+
+    if (isAlreadySelected) {
+      // Remover canal
+      setSelectedChannels(selectedChannels.filter(ch => ch.id !== channelData.id));
+    } else {
+      // Agregar canal (máximo 4)
+      if (selectedChannels.length < 4) {
+        setSelectedChannels([...selectedChannels, channelData]);
+      }
+    }
+  };
+
+  const handleToggleMultiMode = () => {
+    setMultiMode(!multiMode);
+    setSelectedChannels([]);
+    setShowMultiPlayer(false);
+  };
+
+  const handleCloseMultiView = () => {
+    setSelectedChannels([]);
+    setMultiMode(false);
+    setShowMultiPlayer(false);
+  };
+
+  const handleOpenMultiPlayer = () => {
+    if (selectedChannels.length > 0) {
+      setShowMultiPlayer(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100);
+    }
   };
 
   if (loading) {
@@ -108,8 +155,30 @@ export default function AgendaView({ onSelectChannel }) {
     day: 'numeric' 
   });
 
+  // MODO MULTIVIEW ACTIVO: Mostrar MultiPlayer
+  if (showMultiPlayer && selectedChannels.length > 0) {
+    return <MultiPlayer channels={selectedChannels} onClose={handleCloseMultiView} />;
+  }
+
   return (
-    <div style={{ minHeight: '60vh' }}>
+    <>
+      {/* Estilos para animaciones */}
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.9;
+              transform: scale(1.05);
+            }
+          }
+        `}
+      </style>
+
+      <div style={{ minHeight: '60vh' }}>
       {/* Tabs Header */}
       <div className="flex gap-2 mb-4">
         <button
@@ -166,10 +235,61 @@ export default function AgendaView({ onSelectChannel }) {
             }}>
               <span>⚽ {filteredEvents.length} partido{filteredEvents.length !== 1 ? 's' : ''}</span>
               <span>📺 {filteredEvents.reduce((acc, e) => acc + e.canales.length, 0)} canales</span>
+              {multiMode && <span>• {selectedChannels.length}/4 seleccionados</span>}
+              
+              {/* Botón MultiView */}
+              <button
+                onClick={handleToggleMultiMode}
+                style={{
+                  marginLeft: 'auto',
+                  background: multiMode
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                    : 'rgba(255, 255, 255, 0.2)',
+                  border: multiMode ? '2px solid #34d399' : 'none',
+                  color: 'white',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: multiMode ? '700' : '500',
+                  transition: 'all 0.2s',
+                  boxShadow: multiMode ? '0 4px 12px rgba(16, 185, 129, 0.4)' : 'none'
+                }}
+                onMouseOver={(e) => {
+                  if (!multiMode) e.target.style.background = 'rgba(255, 255, 255, 0.3)';
+                }}
+                onMouseOut={(e) => {
+                  if (!multiMode) e.target.style.background = 'rgba(255, 255, 255, 0.2)';
+                }}
+              >
+                {multiMode ? '✅ Modo MultiView' : '📺 MultiView'}
+              </button>
+
+              {/* Ver MultiView (solo si hay canales seleccionados) */}
+              {multiMode && selectedChannels.length > 0 && (
+                <button
+                  onClick={handleOpenMultiPlayer}
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    border: 'none',
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '700',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+                    animation: 'pulse 2s infinite'
+                  }}
+                >
+                  🎬 Ver {selectedChannels.length} Canal{selectedChannels.length > 1 ? 'es' : ''}
+                </button>
+              )}
+
               <button
                 onClick={fetchEvents}
                 style={{
-                  marginLeft: 'auto',
                   background: 'rgba(255, 255, 255, 0.2)',
                   border: 'none',
                   color: 'white',
@@ -186,6 +306,21 @@ export default function AgendaView({ onSelectChannel }) {
                 🔄 Actualizar
               </button>
             </div>
+
+            {/* Instrucciones MultiView */}
+            {multiMode && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.75rem',
+                background: 'rgba(255,255,255,0.15)',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: 'clamp(0.8rem, 2vw, 0.9rem)',
+              }}>
+                💡 <strong>Modo MultiView:</strong> Click en los canales para seleccionar (máximo 4). 
+                Luego presiona "🎬 Ver Canales" para ver todos simultáneamente.
+              </div>
+            )}
 
             {/* Buscador */}
             <div style={{ marginTop: '1.5rem' }}>
@@ -345,53 +480,140 @@ export default function AgendaView({ onSelectChannel }) {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(140px, 45vw, 200px), 1fr))',
                     gap: 'clamp(0.5rem, 2vw, 0.75rem)'
                   }}>
-                    {event.canales.map((canal, index) => (
-                      <button
-                        key={index}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectChannel(event, canal);
-                        }}
-                        style={{
-                          background: 'linear-gradient(135deg, #374151 0%, #1f2937 100%)',
-                          border: '1px solid rgba(255, 255, 255, 0.2)',
-                          color: 'white',
-                          padding: 'clamp(0.75rem, 3vw, 1rem)',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          textAlign: 'left'
-                        }}
-                        onMouseOver={(e) => {
-                          e.target.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
-                          e.target.style.transform = 'scale(1.05)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.target.style.background = 'linear-gradient(135deg, #374151 0%, #1f2937 100%)';
-                          e.target.style.transform = 'scale(1)';
-                        }}
-                      >
-                        <div style={{ 
-                          fontWeight: '600', 
-                          fontSize: 'clamp(0.85rem, 3vw, 1rem)', 
-                          marginBottom: '0.25rem',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          📺 {canal.nombre}
-                        </div>
-                        <div style={{ 
-                          fontSize: 'clamp(0.7rem, 2vw, 0.75rem)', 
-                          color: 'rgba(255, 255, 255, 0.7)',
-                          display: 'flex',
-                          gap: '0.5rem'
-                        }}>
-                          <span>🟢 {canal.calidad}</span>
-                          <span>• {canal.idioma}</span>
-                        </div>
-                      </button>
-                    ))}
+                    {event.canales.map((canal, index) => {
+                      const channelId = `${event.id}_${canal.nombre}`;
+                      const isSelected = multiMode && selectedChannels.some(ch => ch.id === channelId);
+                      const selectionIndex = isSelected 
+                        ? selectedChannels.findIndex(ch => ch.id === channelId) + 1 
+                        : -1;
+                      const isMaxReached = multiMode && selectedChannels.length >= 4 && !isSelected;
+
+                      return (
+                        <button
+                          key={index}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isMaxReached || isSelected) {
+                              handleSelectChannel(event, canal);
+                            }
+                          }}
+                          disabled={isMaxReached}
+                          style={{
+                            background: isSelected
+                              ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                              : 'linear-gradient(135deg, #374151 0%, #1f2937 100%)',
+                            border: isSelected 
+                              ? '2px solid #60a5fa'
+                              : '1px solid rgba(255, 255, 255, 0.2)',
+                            color: 'white',
+                            padding: 'clamp(0.75rem, 3vw, 1rem)',
+                            borderRadius: '8px',
+                            cursor: isMaxReached ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.2s',
+                            textAlign: 'left',
+                            position: 'relative',
+                            opacity: isMaxReached ? 0.5 : 1,
+                            boxShadow: isSelected ? '0 4px 12px rgba(59, 130, 246, 0.5)' : 'none'
+                          }}
+                          onMouseOver={(e) => {
+                            if (!isMaxReached) {
+                              e.target.style.background = isSelected
+                                ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                                : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+                              e.target.style.transform = 'scale(1.05)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            e.target.style.background = isSelected
+                              ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                              : 'linear-gradient(135deg, #374151 0%, #1f2937 100%)';
+                            e.target.style.transform = 'scale(1)';
+                          }}
+                        >
+                          {/* Badge de selección */}
+                          {isSelected && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '-8px',
+                              right: '-8px',
+                              background: '#10b981',
+                              color: '#fff',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.75rem',
+                              fontWeight: '700',
+                              border: '2px solid #1f2937',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                            }}>
+                              {selectionIndex}
+                            </div>
+                          )}
+
+                          {/* Badge de máximo alcanzado */}
+                          {isMaxReached && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '0.5rem',
+                              right: '0.5rem',
+                              background: 'rgba(239, 68, 68, 0.9)',
+                              color: '#fff',
+                              padding: '0.2rem 0.4rem',
+                              borderRadius: '4px',
+                              fontSize: '0.65rem',
+                              fontWeight: '600',
+                            }}>
+                              ⚠️ Máx 4
+                            </div>
+                          )}
+
+                          <div style={{ 
+                            fontWeight: '600', 
+                            fontSize: 'clamp(0.85rem, 3vw, 1rem)', 
+                            marginBottom: '0.25rem',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            📺 {canal.nombre}
+                          </div>
+                          <div style={{ 
+                            fontSize: 'clamp(0.7rem, 2vw, 0.75rem)', 
+                            color: isSelected ? '#e0e7ff' : 'rgba(255, 255, 255, 0.7)',
+                            display: 'flex',
+                            gap: '0.5rem',
+                            flexWrap: 'wrap'
+                          }}>
+                            <span>🟢 {canal.calidad}</span>
+                            <span>• {canal.idioma}</span>
+                          </div>
+
+                          {/* Indicador de modo MultiView */}
+                          {multiMode && !isSelected && !isMaxReached && (
+                            <div style={{
+                              fontSize: '0.7rem',
+                              color: '#60a5fa',
+                              marginTop: '0.25rem',
+                            }}>
+                              👆 Click para agregar
+                            </div>
+                          )}
+                          {multiMode && isSelected && (
+                            <div style={{
+                              fontSize: '0.7rem',
+                              color: '#34d399',
+                              marginTop: '0.25rem',
+                              fontWeight: '600',
+                            }}>
+                              ✅ Seleccionado
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -401,6 +623,7 @@ export default function AgendaView({ onSelectChannel }) {
       )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

@@ -6,7 +6,7 @@
 import cron from 'node-cron';
 import { getAllM3UChannels } from '../sources/m3u_sources.js';
 import { getAllTVTVHDChannels, getSportsEvents } from '../sources/tvtvhd.js';
-import { filterLiveChannels, getHealthStats } from './healthCheck.js';
+import { checkMultipleStreams, filterLiveChannels, getHealthStats } from './healthCheck.js';
 import cacheManager from './cache.js';
 import { UPDATE_INTERVALS, CACHE_TTL } from '../config/sources.config.js';
 
@@ -164,13 +164,52 @@ class ContentAggregator {
       console.log('[Aggregator] 🔍 Iniciando health check...');
       
       const allChannels = await this.getAllChannels();
-      const stats = await getHealthStats(allChannels);
       
-      this.stats.uptime = stats.uptime;
-      this.stats.totalChannels = stats.total;
+      // Verificar en lotes
+      const streams = allChannels.map(ch => ({ id: ch.id, url: ch.url }));
+      const healthResults = await checkMultipleStreams(streams);
       
-      console.log(`[Aggregator] 📊 Health Check: ${stats.alive}/${stats.total} vivos (${stats.uptime})`);
-      return stats;
+      // Actualizar canales con estado de salud y ajustar scores
+      const updatedChannels = allChannels.map(ch => {
+        const health = healthResults.get(ch.id);
+        const isAlive = health?.alive === true;
+        
+        return {
+          ...ch,
+          isAlive,
+          latency: health?.latency || 0,
+          // Añadir +50 de score si está vivo
+          score: isAlive ? (ch.score || 0) + 50 : (ch.score || 0),
+        };
+      });
+      
+      // Actualizar caché con canales validados
+      const m3uChannels = updatedChannels.filter(ch => ch.source === 'm3u');
+      const scrapedChannels = updatedChannels.filter(ch => ch.source !== 'm3u');
+      
+      if (m3uChannels.length > 0) {
+        cacheManager.set('aggregator:m3u_channels', m3uChannels, CACHE_TTL.M3U_CHANNELS);
+      }
+      if (scrapedChannels.length > 0) {
+        cacheManager.set('aggregator:scraped_channels', scrapedChannels, CACHE_TTL.SCRAPED_CHANNELS);
+      }
+      
+      // Calcular estadísticas
+      const alive = updatedChannels.filter(ch => ch.isAlive).length;
+      const dead = updatedChannels.length - alive;
+      const uptime = ((alive / updatedChannels.length) * 100).toFixed(2) + '%';
+      
+      this.stats.uptime = uptime;
+      this.stats.totalChannels = updatedChannels.length;
+      
+      console.log(`[Aggregator] 📊 Health Check: ${alive}/${updatedChannels.length} vivos (${uptime})`);
+      
+      return {
+        total: updatedChannels.length,
+        alive,
+        dead,
+        uptime,
+      };
     } catch (error) {
       console.error('[Aggregator] Error en health check:', error.message);
       return null;
@@ -185,11 +224,33 @@ class ContentAggregator {
     const m3uChannels = cacheManager.get('aggregator:m3u_channels') || await this.updateM3UChannels();
     const scrapedChannels = cacheManager.get('aggregator:scraped_channels') || await this.updateScrapedChannels();
 
-    // Combinar y eliminar duplicados por URL
+    // Combinar todos los canales
     const allChannels = [...m3uChannels, ...scrapedChannels];
-    const uniqueChannels = Array.from(
-      new Map(allChannels.map(ch => [ch.url, ch])).values()
-    );
+    
+    // Deduplicación inteligente por URL (mantener el de mejor score)
+    const channelMap = new Map();
+    
+    for (const channel of allChannels) {
+      const existingChannel = channelMap.get(channel.url);
+      
+      if (!existingChannel) {
+        // Primera vez que vemos esta URL
+        channelMap.set(channel.url, channel);
+      } else {
+        // Ya existe, comparar scores
+        const currentScore = channel.score || 0;
+        const existingScore = existingChannel.score || 0;
+        
+        if (currentScore > existingScore) {
+          // El nuevo tiene mejor score, reemplazar
+          channelMap.set(channel.url, channel);
+        }
+      }
+    }
+    
+    // Convertir a array y ordenar por score
+    const uniqueChannels = Array.from(channelMap.values())
+      .sort((a, b) => (b.score || 0) - (a.score || 0));
 
     this.stats.totalChannels = uniqueChannels.length;
 

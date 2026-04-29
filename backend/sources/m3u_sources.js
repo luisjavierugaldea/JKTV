@@ -45,19 +45,27 @@ function parseM3U(content) {
     else if (line.startsWith('http') && currentChannel) {
       currentChannel.url = line;
       
-      // Validar que sea canal LATAM
-      if (isLatamChannel(currentChannel)) {
+      // Validar que sea canal LATAM (o deportes globales)
+      const category = detectCategory(currentChannel);
+      const isValidChannel = isLatamChannel(currentChannel) || category === 'sports';
+      
+      if (isValidChannel) {
+        const qualityInfo = detectQuality(currentChannel);
+        const score = calculateScore(currentChannel, qualityInfo, category);
+        
         channels.push({
           id: `m3u_${currentChannel.tvgId || currentChannel.name.toLowerCase().replace(/\s+/g, '_')}`,
           name: currentChannel.name,
           logo: currentChannel.logo,
           url: currentChannel.url,
           group: currentChannel.groupTitle,
-          category: detectCategory(currentChannel),
+          category,
           country: detectCountry(currentChannel),
           source: 'm3u',
-          quality: detectQuality(currentChannel),
-          language: 'es',
+          quality: qualityInfo.label,
+          language: detectLanguage(currentChannel),
+          score,
+          isAlive: null, // Se actualiza con healthCheck
         });
       }
 
@@ -69,17 +77,78 @@ function parseM3U(content) {
 }
 
 /**
- * Detectar calidad del stream
+ * Detectar calidad del stream con scoring
  */
 function detectQuality(channel) {
+  const combined = `${channel.name} ${channel.groupTitle} ${channel.url || ''}`.toLowerCase();
+  
+  // 4K/UHD
+  if (combined.includes('4k') || combined.includes('uhd') || combined.includes('2160p')) {
+    return { label: '4K', score: 40 };
+  }
+  // 1080p/FHD
+  if (combined.includes('fhd') || combined.includes('1080p') || combined.includes('full hd')) {
+    return { label: '1080p', score: 30 };
+  }
+  // 720p/HD
+  if (combined.includes('hd') || combined.includes('720p')) {
+    return { label: 'HD', score: 20 };
+  }
+  // SD
+  if (combined.includes('sd') || combined.includes('480p') || combined.includes('360p')) {
+    return { label: 'SD', score: 5 };
+  }
+  
+  // Por defecto HD
+  return { label: 'HD', score: 15 };
+}
+
+/**
+ * Calcular score total del canal
+ */
+function calculateScore(channel, qualityInfo, category) {
+  let score = 0;
+  
+  // Calidad (base score)
+  score += qualityInfo.score;
+  
+  // Tipo de contenido (prioridad)
+  if (category === 'sports') score += 30;
+  else if (category === 'movies') score += 25; // Películas 24/7
+  else if (category === 'entertainment') score += 20;
+  else if (category === 'news') score += 10;
+  else score += 5;
+  
+  // Bonus por palabras clave premium
+  const combined = `${channel.name} ${channel.groupTitle}`.toLowerCase();
+  if (combined.includes('premium') || combined.includes('plus') || combined.includes('vip')) score += 10;
+  if (combined.includes('24/7') || combined.includes('247')) score += 15;
+  if (combined.includes('hd') && !combined.includes('4k')) score += 5;
+  if (combined.includes('oficial') || combined.includes('official')) score += 8;
+  
+  return score;
+}
+
+/**
+ * Detectar idioma del canal
+ */
+function detectLanguage(channel) {
   const combined = `${channel.name} ${channel.groupTitle}`.toLowerCase();
   
-  if (combined.includes('4k') || combined.includes('uhd')) return '4K';
-  if (combined.includes('fhd') || combined.includes('1080p')) return 'FHD';
-  if (combined.includes('hd') || combined.includes('720p')) return 'HD';
-  if (combined.includes('sd') || combined.includes('480p')) return 'SD';
+  // Español es el idioma por defecto LATAM
+  if (combined.includes('español') || combined.includes('spanish') || 
+      combined.includes('latino') || combined.includes('latam')) {
+    return 'es';
+  }
   
-  return 'HD'; // Por defecto asumimos HD
+  // Para deportes, puede ser cualquier idioma
+  const category = detectCategory(channel);
+  if (category === 'sports') {
+    if (combined.includes('english') || combined.includes('uk')) return 'en';
+    if (combined.includes('portuguese') || combined.includes('brasil')) return 'pt';
+  }
+  
+  return 'es'; // Por defecto español
 }
 
 /**

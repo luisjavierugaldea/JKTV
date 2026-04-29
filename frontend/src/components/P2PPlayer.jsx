@@ -165,6 +165,7 @@ export default function P2PPlayer({ streamUrl, channelName = 'Canal', isEmbed = 
         autoPlay
         playsInline
         muted={false}
+        preload="auto"
         style={{ objectFit: 'contain', backgroundColor: '#000' }}
       />
     </div>

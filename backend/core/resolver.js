@@ -130,21 +130,46 @@ export async function resolveChannel(channelName) {
 }
 
 /**
- * Obtener el mejor stream para un canal (validado)
+ * Obtener el mejor stream para un canal (con scoring mejorado)
  * @param {string} channelName
  * @returns {Promise<Object|null>}
  */
-export async function getBestStream(name) {
-  const channels = await aggregator.getAllChannels()
+export async function getBestStream(channelName) {
+  const results = await resolveChannel(channelName);
+  
+  if (results.length === 0) {
+    return null;
+  }
 
-  const matches = channels.filter(c =>
-    c.name.toLowerCase().includes(name.toLowerCase())
-  )
+  // Validar los top 3 streams
+  const topStreams = results.slice(0, 3);
+  
+  for (const stream of topStreams) {
+    try {
+      const health = await checkStreamHealth(stream.url, { timeout: 3000 });
+      
+      if (health.alive) {
+        console.log(`[Resolver] ✅ Stream válido: ${stream.name} (${stream.quality})`);
+        return {
+          ...stream,
+          isAlive: true,
+          latency: health.latency,
+          validated: true,
+        };
+      }
+    } catch (error) {
+      console.error(`[Resolver] ❌ Stream inválido: ${stream.name}`);
+      continue;
+    }
+  }
 
-  // 🔥 ordenar por calidad + estado
-  matches.sort((a, b) => b.quality - a.quality)
-
-  return matches[0] || null
+  // Si ninguno funciona, devolver el de mejor score sin validar
+  console.log(`[Resolver] ⚠️ Ningún stream validado, devolviendo mejor score`);
+  return {
+    ...results[0],
+    isAlive: false,
+    validated: false,
+  };
 }
 
 /**

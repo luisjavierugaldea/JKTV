@@ -33,8 +33,9 @@ export const ALLOWED_COUNTRIES = [
   'uy',
 ];
 
-// Keywords deportivas permitidas
+// Keywords deportivas permitidas (incluye global)
 export const SPORTS_KEYWORDS = [
+  // LATAM
   'espn',
   'fox sports',
   'fox',
@@ -63,6 +64,60 @@ export const SPORTS_KEYWORDS = [
   'caracol',
   'rcn',
   'deportv',
+  // GLOBAL (permitido para deportes)
+  'premier league',
+  'laliga',
+  'serie a',
+  'bundesliga',
+  'ligue 1',
+  'champions league',
+  'uefa',
+  'nfl',
+  'nba',
+  'mlb',
+  'nhl',
+  'f1',
+  'formula',
+  'ufc',
+  'wwe',
+  'boxing',
+  'tennis',
+  'golf',
+  'motogp',
+  'cricket',
+  'rugby',
+  'setanta',
+  'arena sport',
+  'sport tv',
+  'eurosport',
+  'eleven sports',
+];
+
+// Keywords de películas 24/7
+export const MOVIES_247_KEYWORDS = [
+  '24/7',
+  '247',
+  'cine',
+  'pelicula',
+  'peliculas',
+  'movie',
+  'movies',
+  'cinema',
+  'films',
+  'film',
+  'paramount',
+  'warner',
+  'hbo',
+  'fx',
+  'amc',
+  'tnt',
+  'space',
+  'cinecanal',
+  'cinemax',
+  'golden',
+  'studio universal',
+  'sony',
+  'axn',
 ];
 
 // Keywords de entretenimiento LATAM
@@ -174,10 +229,15 @@ export function isLatamChannel(channel) {
   const group = (channel.group || channel.groupTitle || '').toLowerCase();
   const combined = `${name} ${group}`;
 
-  // 1. Excluir palabras prohibidas
-  for (const excluded of EXCLUDED_KEYWORDS) {
-    if (combined.includes(excluded)) {
-      return false;
+  // 1. Excluir palabras prohibidas (excepto si es deportes o películas premium)
+  const category = detectCategory(channel);
+  const isSpecialCategory = category === 'sports' || category === 'movies';
+  
+  if (!isSpecialCategory) {
+    for (const excluded of EXCLUDED_KEYWORDS) {
+      if (combined.includes(excluded)) {
+        return false;
+      }
     }
   }
 
@@ -188,21 +248,24 @@ export function isLatamChannel(channel) {
     }
   }
 
-  // 3. Verificar keywords deportivas
-  for (const keyword of SPORTS_KEYWORDS) {
-    if (combined.includes(keyword)) {
-      return true;
-    }
+  // 3. Permitir deportes globales
+  if (category === 'sports') {
+    return true;
   }
 
-  // 4. Verificar keywords entretenimiento
+  // 4. Permitir películas 24/7
+  if (category === 'movies') {
+    return true;
+  }
+
+  // 5. Verificar keywords entretenimiento
   for (const keyword of ENTERTAINMENT_KEYWORDS) {
     if (combined.includes(keyword)) {
       return true;
     }
   }
 
-  // 5. Verificar keywords noticias
+  // 6. Verificar keywords noticias
   for (const keyword of NEWS_KEYWORDS) {
     if (combined.includes(keyword)) {
       return true;
@@ -216,17 +279,24 @@ export function isLatamChannel(channel) {
 /**
  * Detectar categoría del canal
  * @param {Object} channel
- * @returns {string} - 'sports' | 'entertainment' | 'news' | 'other'
+ * @returns {string} - 'sports' | 'movies' | 'entertainment' | 'news' | 'other'
  */
 export function detectCategory(channel) {
   const name = (channel.name || '').toLowerCase();
   const group = (channel.group || channel.groupTitle || '').toLowerCase();
   const combined = `${name} ${group}`;
 
-  // Deportes
+  // Deportes (prioridad alta)
   for (const keyword of SPORTS_KEYWORDS) {
     if (combined.includes(keyword)) {
       return 'sports';
+    }
+  }
+
+  // Películas 24/7
+  for (const keyword of MOVIES_247_KEYWORDS) {
+    if (combined.includes(keyword)) {
+      return 'movies';
     }
   }
 

@@ -705,6 +705,12 @@ const TVView = ({ onSelectChannel }) => {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedCategory(cat.id);
+                }
+              }}
               tabIndex={10 + idx}
               style={{
                 padding: '0.5rem 1rem',
@@ -735,6 +741,12 @@ const TVView = ({ onSelectChannel }) => {
             <button
               key={country.id}
               onClick={() => setSelectedCountry(country.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedCountry(country.id);
+                }
+              }}
               tabIndex={20 + idx}
               style={{
                 padding: '0.5rem 1rem',

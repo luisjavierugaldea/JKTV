@@ -246,6 +246,7 @@ type: isM3U8 ? 'hls' : 'embed'  // Si es M3U8 → false (usar HLS), si no → tr
               {/* Botón MultiView */}
               <button
                 onClick={handleToggleMultiMode}
+                tabIndex={3}
                 style={{
                   marginLeft: 'auto',
                   background: multiMode
@@ -275,6 +276,7 @@ type: isM3U8 ? 'hls' : 'embed'  // Si es M3U8 → false (usar HLS), si no → tr
               {multiMode && selectedChannels.length > 0 && (
                 <button
                   onClick={handleOpenMultiPlayer}
+                  tabIndex={4}
                   style={{
                     background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                     border: 'none',
@@ -295,6 +297,7 @@ type: isM3U8 ? 'hls' : 'embed'  // Si es M3U8 → false (usar HLS), si no → tr
 
               <button
                 onClick={fetchEvents}
+                tabIndex={5}
                 style={{
                   background: 'rgba(255, 255, 255, 0.2)',
                   border: 'none',
@@ -334,8 +337,9 @@ type: isM3U8 ? 'hls' : 'embed'  // Si es M3U8 → false (usar HLS), si no → tr
                 type="text"
                 placeholder="🔍 Buscar partido o canal..."
                 value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
+                onChange={(e) => setSearchTerm(e.target.value)}
+                tabIndex={6}
+                style={{
               width: '100%',
               maxWidth: '500px',
               background: 'rgba(255, 255, 255, 0.15)',
@@ -504,6 +508,7 @@ type: isM3U8 ? 'hls' : 'embed'  // Si es M3U8 → false (usar HLS), si no → tr
                             }
                           }}
                           disabled={isMaxReached}
+                          tabIndex={100 + (filteredEvents.indexOf(event) * 20) + index}
                           style={{
                             background: isSelected
                               ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'

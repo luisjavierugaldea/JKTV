@@ -35,66 +35,67 @@ const MultiPlayer = ({ channels, onClose }) => {
 
   // 🔥 HLS INIT (FIXED)
   useEffect(() => {
-    orderedChannels.forEach((channel, index) => {
-      const video = videoRefs.current[index]
-      if (!video || channel.isEmbed) return
-
-      const url = getUrl(channel.url)
-
-      // destruir si ya existía
-      if (hlsInstances.current[index]) {
-        hlsInstances.current[index].destroy()
-        hlsInstances.current[index] = null
-      }
-
-      if ((url.includes('.m3u8') || url.includes('m3u8')) && Hls.isSupported()) {
-        const hls = new Hls({
-          enableWorker: true,
-          maxBufferLength: 30,
-        })
-
-        hls.loadSource(url)
-        hls.attachMedia(video)
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          const isActive = index === activeIndex
-
-          video.muted = !isActive
-
-          video.oncanplay = () => {
-            if (isActive) {
-              video.play().catch(() => {})
-            }
-          }
-        })
-
-        hls.on(Hls.Events.ERROR, (event, data) => {
-          if (data.fatal) {
-            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-              hls.startLoad()
-            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-              hls.recoverMediaError()
-            } else {
-              hls.destroy()
-              hlsInstances.current[index] = null
-            }
-          }
-        })
-
-        hlsInstances.current[index] = hls
-      } else {
-        video.src = url
-        video.muted = true
-
-        video.oncanplay = () => {
-          if (index === activeIndex) {
-            video.play().catch(() => {})
-          }
+    console.log('🚀 Inicializando HLS para', orderedChannels.length, 'canales')
+    
+    // Pequeño delay para asegurar que los refs están listos
+    const timer = setTimeout(() => {
+      orderedChannels.forEach((channel, index) => {
+        const video = videoRefs.current[index]
+        if (!video || channel.isEmbed) {
+          console.log(`⏭️ Skip canal ${index}:`, !video ? 'no ref' : 'es embed')
+          return
         }
-      }
-    })
+
+        const url = getUrl(channel.url)
+        console.log(`📺 Inicializando canal ${index}: ${channel.name}`)
+
+        // destruir si ya existía
+        if (hlsInstances.current[index]) {
+          hlsInstances.current[index].destroy()
+          hlsInstances.current[index] = null
+        }
+
+        if ((url.includes('.m3u8') || url.includes('m3u8')) && Hls.isSupported()) {
+          const hls = new Hls({
+            enableWorker: true,
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+          })
+
+          hls.loadSource(url)
+          hls.attachMedia(video)
+
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            console.log(`✅ Canal ${index} listo: ${channel.name}`)
+            // Iniciar reproducción de TODOS los canales
+            video.play().catch(() => {})
+          })
+
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            if (data.fatal) {
+              console.error(`❌ Error fatal canal ${index}:`, data.type, data.details)
+              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                hls.startLoad()
+              } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                hls.recoverMediaError()
+              } else {
+                hls.destroy()
+                hlsInstances.current[index] = null
+              }
+            }
+          })
+
+          hlsInstances.current[index] = hls
+        } else {
+          console.log(`🍎 Usando Safari nativo para canal ${index}`)
+          video.src = url
+          video.play().catch(() => {})
+        }
+      })
+    }, 300)
 
     return () => {
+      clearTimeout(timer)
       hlsInstances.current.forEach(h => h && h.destroy())
       hlsInstances.current = []
     }
@@ -102,20 +103,20 @@ const MultiPlayer = ({ channels, onClose }) => {
 
   // 🔥 AUDIO CONTROL FIX
   useEffect(() => {
+    console.log('🔊 Control de audio - Canal activo:', activeIndex)
+    
     videoRefs.current.forEach((video, i) => {
       if (!video) return
 
       const isActive = i === activeIndex
-
-      video.muted = true
-
-      if (isActive) {
-        video.muted = false
-        video.volume = 1
-
-        if (video.paused) {
-          video.play().catch(() => {})
-        }
+      
+      // Solo el activo tiene audio
+      video.muted = !isActive
+      video.volume = isActive ? 1 : 0
+      
+      // Asegurar que todos están reproduciendo
+      if (video.paused) {
+        video.play().catch(() => {})
       }
     })
   }, [activeIndex])
@@ -129,7 +130,7 @@ const MultiPlayer = ({ channels, onClose }) => {
 
     return (
       <div
-        key={index}
+        key={`video-${channel.url}-${index}`}
         onClick={() => handleClick(index)}
         style={{
           position: 'relative',
@@ -146,10 +147,11 @@ const MultiPlayer = ({ channels, onClose }) => {
           ref={(el) => {
             if (el) videoRefs.current[index] = el
           }}
+          autoPlay
           playsInline
           muted
           controls={isMain}
-          preload="metadata"
+          preload="auto"
           style={{
             width: '100%',
             height: '100%',
@@ -268,7 +270,7 @@ const MultiPlayer = ({ channels, onClose }) => {
     )
   }
 
-  // PRINCIPAL
+  // PRINCIPAL - Layout fijo sin mover videos
   return (
     <div style={{
       position: 'fixed',
@@ -282,24 +284,32 @@ const MultiPlayer = ({ channels, onClose }) => {
       zIndex: 9999,
       display: 'flex',
       flexDirection: 'column',
-      gap: '5px',
-      padding: '5px'
+      overflow: 'hidden'
     }}>
       {renderHeader()}
 
-      <div style={{ flex: 3, width: '100%' }}>
-        {renderVideo(orderedChannels[activeIndex], activeIndex, true)}
-      </div>
-
+      {/* Grid de todos los canales - sin reordenar */}
       <div style={{
-        flex: 1,
         width: '100%',
+        height: '100%',
+        padding: '5px',
+        boxSizing: 'border-box',
         display: 'grid',
-        gridTemplateColumns: `repeat(${orderedChannels.length - 1}, 1fr)`,
-        gap: '5px'
+        gap: '5px',
+        // Layout: el activo es 70% alto, los demás comparten 30%
+        gridTemplateRows: orderedChannels.length === 3 
+          ? activeIndex === 0 ? '70% 15% 15%' 
+            : activeIndex === 1 ? '15% 70% 15%'
+            : '15% 15% 70%'
+          : orderedChannels.length === 4
+          ? activeIndex === 0 ? '70% 10% 10% 10%'
+            : activeIndex === 1 ? '10% 70% 10% 10%'
+            : activeIndex === 2 ? '10% 10% 70% 10%'
+            : '10% 10% 10% 70%'
+          : '100%'
       }}>
-        {orderedChannels.map((c, i) =>
-          i !== activeIndex && renderVideo(c, i)
+        {orderedChannels.map((channel, index) =>
+          renderVideo(channel, index, index === activeIndex)
         )}
       </div>
     </div>

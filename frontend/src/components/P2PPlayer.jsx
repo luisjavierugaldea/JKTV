@@ -3,6 +3,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { API_BASE_URL } from '../config';
 
 export default function P2PPlayer({ streamUrl, channelName = 'Canal', isEmbed = false }) {
   const videoRef = useRef(null);
@@ -10,10 +11,24 @@ export default function P2PPlayer({ streamUrl, channelName = 'Canal', isEmbed = 
   const hlsRef = useRef(null);
   const [error, setError] = useState(null);
 
+  // Envolver URLs HLS con el proxy (igual que MultiPlayer)
+  const getProxiedUrl = (url) => {
+    if (!url) return '';
+    
+    // Si es embed (iframe), no modificar
+    if (isEmbed) return url;
+    
+    // Si NO es embed, envolver con proxy Base64
+    const base64Url = btoa(url);
+    return `${API_BASE_URL}/iptv-proxy/stream?url=${base64Url}`;
+  };
+
   useEffect(() => {
     if (!streamUrl) return;
 
+    const proxiedUrl = getProxiedUrl(streamUrl);
     console.log(`[P2PPlayer] ▶️ Cargando: ${channelName} ${isEmbed ? '(embed)' : '(HLS)'}`);
+    console.log(`[P2PPlayer] 🔗 URL: ${proxiedUrl}`);
 
     // Si es embed, el iframe se encarga de todo
     if (isEmbed) {
@@ -32,7 +47,7 @@ export default function P2PPlayer({ streamUrl, channelName = 'Canal', isEmbed = 
 
     // Safari soporta HLS nativamente
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamUrl;
+      video.src = proxiedUrl;
       video.play().catch(err => {
         console.error('[P2PPlayer] Error reproduciendo:', err);
         setError('No se pudo reproducir el video');
@@ -61,7 +76,7 @@ export default function P2PPlayer({ streamUrl, channelName = 'Canal', isEmbed = 
             maxMaxBufferLength: 60
           });
 
-          hls.loadSource(streamUrl);
+          hls.loadSource(proxiedUrl);
           hls.attachMedia(video);
 
           hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
@@ -113,8 +128,10 @@ export default function P2PPlayer({ streamUrl, channelName = 'Canal', isEmbed = 
     );
   }
 
-  // Modo EMBED: Usar iframe (jjfutbol2.lat es más confiable que tvtvhd.com)
+  // Modo EMBED: Usar iframe
   if (isEmbed) {
+    const embedUrl = getProxiedUrl(streamUrl);
+    
     return (
       <div className="w-full h-full bg-black relative">
         {/* Indicador de carga */}
@@ -133,7 +150,7 @@ export default function P2PPlayer({ streamUrl, channelName = 'Canal', isEmbed = 
         {/* Iframe sobre el indicador (z-index mayor para que cubra al cargar) */}
         <iframe
           ref={iframeRef}
-          src={streamUrl}
+          src={embedUrl}
           className="w-full h-full absolute inset-0 z-10"
           frameBorder="0"
           allow="autoplay; fullscreen; encrypted-media; picture-in-picture"

@@ -60,15 +60,19 @@ export default function AgendaView({ onSelectChannel }) {
 
   // Manejar selección de canal
   const handleSelectChannel = (event, canal) => {
+    // Auto-detectar si es embed o M3U8
+    const isM3U8 = canal.url.includes('.m3u8') || canal.url.includes('m3u8');
+    
     // Modo normal: selección única
     if (!multiMode) {
       console.log('[AgendaView] 📺 Canal seleccionado:', canal.nombre, '→', canal.url);
+      console.log('[AgendaView] 🔍 Tipo:', isM3U8 ? 'M3U8 (HLS)' : 'Embed (iframe)');
       
       onSelectChannel({
         name: `${event.titulo} - ${canal.nombre}`,
         url: canal.url,
         logo: event.logo,
-        isEmbed: true
+        isEmbed: !isM3U8  // Si es M3U8 → false (usar HLS), si no → true (usar iframe)
       });
       
       setTimeout(() => {
@@ -83,7 +87,7 @@ export default function AgendaView({ onSelectChannel }) {
       name: `${event.titulo} - ${canal.nombre}`,
       url: canal.url,
       logo: event.logo,
-      isEmbed: true
+      isEmbed: !isM3U8  // Si es M3U8 → false (usar HLS), si no → true (usar iframe)
     };
 
     const isAlreadySelected = selectedChannels.some(ch => ch.id === channelData.id);

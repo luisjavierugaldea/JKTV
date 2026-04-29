@@ -132,6 +132,54 @@ const MultiPlayer = ({ channels, onClose }) => {
     })
   }, [activeIndex])
 
+  // 🎮 CONTROL REMOTO / TECLADO (Android TV)
+  useEffect(() => {
+    const handleKey = (e) => {
+      const key = e.key || e.keyCode
+
+      // DERECHA
+      if (key === 'ArrowRight' || key === 39) {
+        setActiveIndex((prev) => (prev + 1) % orderedChannels.length)
+      }
+
+      // IZQUIERDA
+      if (key === 'ArrowLeft' || key === 37) {
+        setActiveIndex((prev) =>
+          prev === 0 ? orderedChannels.length - 1 : prev - 1
+        )
+      }
+
+      // ARRIBA
+      if (key === 'ArrowUp' || key === 38) {
+        setActiveIndex((prev) =>
+          prev === 0 ? orderedChannels.length - 1 : prev - 1
+        )
+      }
+
+      // ABAJO
+      if (key === 'ArrowDown' || key === 40) {
+        setActiveIndex((prev) => (prev + 1) % orderedChannels.length)
+      }
+
+      // ENTER
+      if (key === 'Enter' || key === 13) {
+        // No hacer nada extra, solo mantener canal activo
+        setActiveIndex((prev) => prev)
+      }
+
+      // BACK / ESC
+      if (key === 'Escape' || key === 27) {
+        onClose()
+      }
+    }
+
+    window.addEventListener('keydown', handleKey)
+
+    return () => {
+      window.removeEventListener('keydown', handleKey)
+    }
+  }, [orderedChannels, onClose])
+
   const handleClick = (index) => {
     setActiveIndex(index)
   }

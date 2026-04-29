@@ -61,7 +61,25 @@ const TVView = ({ onSelectChannel }) => {
     applyFilters();
   }, [channels, selectedCategory, selectedCountry, searchQuery]);
 
-  // 🎬 AGRUPAR CANALES EN SECCIONES (tipo Netflix)
+  // � Scroll automático para navegación con control remoto
+  useEffect(() => {
+    const handleFocus = (e) => {
+      const target = e.target;
+      if (target.tagName === 'BUTTON' || target.tagName === 'INPUT') {
+        // Scroll suave hacia el elemento enfocado
+        target.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'center',
+        });
+      }
+    };
+
+    document.addEventListener('focus', handleFocus, true);
+    return () => document.removeEventListener('focus', handleFocus, true);
+  }, []);
+
+  // �🎬 AGRUPAR CANALES EN SECCIONES (tipo Netflix)
   const buildSections = () => {
     const sections = [
       {
@@ -281,9 +299,10 @@ const TVView = ({ onSelectChannel }) => {
                 key={`${section.id}_${channel.id}_${index}`}
                 onClick={() => handleSelectChannel(channel)}
                 disabled={isMaxReached}
+                tabIndex={100 + (section.channels.indexOf(channel))}
                 style={{
-                  minWidth: 'clamp(180px, 35vw, 260px)',
-                  maxWidth: 'clamp(180px, 35vw, 260px)',
+                  minWidth: '200px',
+                  maxWidth: '200px',
                   background: isSelected
                     ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
                     : 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
@@ -291,7 +310,7 @@ const TVView = ({ onSelectChannel }) => {
                     ? '3px solid #60a5fa'
                     : '2px solid #374151',
                   borderRadius: '12px',
-                  padding: 'clamp(0.75rem, 3vw, 1rem)',
+                  padding: '0.75rem',
                   cursor: isMaxReached ? 'not-allowed' : 'pointer',
                   transition: 'all 0.3s',
                   color: '#fff',
@@ -363,7 +382,7 @@ const TVView = ({ onSelectChannel }) => {
                 )}
 
                 <div style={{
-                  fontSize: 'clamp(0.95rem, 3vw, 1.05rem)',
+                  fontSize: '0.95rem',
                   fontWeight: '600',
                   width: '100%',
                   overflow: 'hidden',
@@ -376,7 +395,7 @@ const TVView = ({ onSelectChannel }) => {
                 <div style={{
                   display: 'flex',
                   gap: '0.5rem',
-                  fontSize: 'clamp(0.7rem, 2.2vw, 0.8rem)',
+                  fontSize: '0.75rem',
                   color: isSelected ? '#e0e7ff' : '#9ca3af',
                   flexWrap: 'wrap',
                 }}>
@@ -660,13 +679,14 @@ const TVView = ({ onSelectChannel }) => {
         {/* Búsqueda */}
         <input
           type="text"
-          placeholder="🔍 Buscar canal..."
+          placeholder="🔍 Buscar canal (Ej. ESPN, Fox, Caracol)..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          tabIndex={1}
           style={{
             width: '100%',
-            padding: 'clamp(0.75rem, 2.5vw, 1rem)',
-            fontSize: 'clamp(0.9rem, 2.5vw, 1rem)',
+            padding: '0.6rem 1rem',
+            fontSize: '0.95rem',
             borderRadius: '12px',
             border: '2px solid #374151',
             background: '#1f2937',
@@ -678,16 +698,17 @@ const TVView = ({ onSelectChannel }) => {
         {/* Categorías */}
         <div style={{
           display: 'flex',
-          gap: 'clamp(0.5rem, 2vw, 0.75rem)',
+          gap: '0.5rem',
           flexWrap: 'wrap',
         }}>
-          {categories.map(cat => (
+          {categories.map((cat, idx) => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
+              tabIndex={10 + idx}
               style={{
-                padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem)',
-                fontSize: 'clamp(0.85rem, 2.5vw, 1rem)',
+                padding: '0.5rem 1rem',
+                fontSize: '0.9rem',
                 borderRadius: '10px',
                 border: 'none',
                 background: selectedCategory === cat.id
@@ -707,16 +728,17 @@ const TVView = ({ onSelectChannel }) => {
         {/* Países */}
         <div style={{
           display: 'flex',
-          gap: 'clamp(0.5rem, 2vw, 0.75rem)',
+          gap: '0.5rem',
           flexWrap: 'wrap',
         }}>
-          {countries.map(country => (
+          {countries.map((country, idx) => (
             <button
               key={country.id}
               onClick={() => setSelectedCountry(country.id)}
+              tabIndex={20 + idx}
               style={{
-                padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem)',
-                fontSize: 'clamp(0.85rem, 2.5vw, 1rem)',
+                padding: '0.5rem 1rem',
+                fontSize: '0.9rem',
                 borderRadius: '10px',
                 border: 'none',
                 background: selectedCountry === country.id
@@ -765,6 +787,7 @@ const TVView = ({ onSelectChannel }) => {
                     key={`${channel.id}_${index}`}
                     onClick={() => handleSelectChannel(channel)}
                     disabled={isMaxReached}
+                    tabIndex={500 + index}
                     style={{
                       background: isSelected
                         ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'

@@ -10,7 +10,7 @@
  */
 
 // 🎯 CAMBIA AQUÍ ANTES DE COMPILAR
-const MODE = 'dev';
+const MODE = 'apk';
 
 // IP de tu PC en la red WiFi (solo necesaria para MODE='apk')
 // Mírala con: ipconfig → Adaptador WiFi → Dirección IPv4

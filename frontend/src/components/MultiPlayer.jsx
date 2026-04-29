@@ -33,72 +33,80 @@ const MultiPlayer = ({ channels, onClose }) => {
     setOrderedChannels(channels)
   }, [channels])
 
-  // 🔥 HLS INIT (FIXED)
+  // 🔥 HLS INIT (FIXED - SIN setTimeout)
   useEffect(() => {
     console.log('🚀 Inicializando HLS para', orderedChannels.length, 'canales')
     
-    // Pequeño delay para asegurar que los refs están listos
-    const timer = setTimeout(() => {
-      orderedChannels.forEach((channel, index) => {
-        const video = videoRefs.current[index]
-        if (!video || channel.isEmbed) {
-          console.log(`⏭️ Skip canal ${index}:`, !video ? 'no ref' : 'es embed')
-          return
-        }
+    // Ejecutar directamente sin delay
+    orderedChannels.forEach((channel, index) => {
+      const video = videoRefs.current[index]
+      if (!video || channel.isEmbed) {
+        console.log(`⏭️ Skip canal ${index}:`, !video ? 'no ref' : 'es embed')
+        return
+      }
 
-        const url = getUrl(channel.url)
-        console.log(`📺 Inicializando canal ${index}: ${channel.name}`)
+      const url = getUrl(channel.url)
+      console.log(`📺 Inicializando canal ${index}: ${channel.name}`)
 
-        // destruir si ya existía
-        if (hlsInstances.current[index]) {
-          hlsInstances.current[index].destroy()
-          hlsInstances.current[index] = null
-        }
+      // destruir si ya existía
+      if (hlsInstances.current[index]) {
+        hlsInstances.current[index].destroy()
+        hlsInstances.current[index] = null
+      }
 
-        if ((url.includes('.m3u8') || url.includes('m3u8')) && Hls.isSupported()) {
-          const hls = new Hls({
-            enableWorker: true,
-            maxBufferLength: 30,
-            maxMaxBufferLength: 60,
-          })
+      if ((url.includes('.m3u8') || url.includes('m3u8')) && Hls.isSupported()) {
+        const hls = new Hls({
+          enableWorker: true,
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+        })
 
-          hls.loadSource(url)
-          hls.attachMedia(video)
+        hls.loadSource(url)
+        hls.attachMedia(video)
 
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            console.log(`✅ Canal ${index} listo: ${channel.name}`)
-            // Iniciar reproducción de TODOS los canales
-            video.play().catch(() => {})
-          })
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log(`✅ Canal ${index} listo: ${channel.name}`)
+          // FIX: Audio control + oncanplay
+          const isActive = index === activeIndex
+          video.muted = !isActive
+          
+        //   video.oncanplay = () => {
+        //     video.play().catch(() => {})
+        //   }
+        video.oncanplay = () => {
+ if (video.paused && i === activeIndex) {
+  video.play().catch(() => {})
+}
+}
+        })
 
-          hls.on(Hls.Events.ERROR, (event, data) => {
-            if (data.fatal) {
-              console.error(`❌ Error fatal canal ${index}:`, data.type, data.details)
-              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                hls.startLoad()
-              } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                hls.recoverMediaError()
-              } else {
-                hls.destroy()
-                hlsInstances.current[index] = null
-              }
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            console.error(`❌ Error fatal canal ${index}:`, data.type, data.details)
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              hls.startLoad()
+            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+              hls.recoverMediaError()
+            } else {
+              hls.destroy()
+              hlsInstances.current[index] = null
             }
-          })
+          }
+        })
 
-          hlsInstances.current[index] = hls
-        } else {
-          console.log(`🍎 Usando Safari nativo para canal ${index}`)
-          video.src = url
-          video.play().catch(() => {})
-        }
-      })
-    }, 300)
+        hlsInstances.current[index] = hls
+      } else {
+        console.log(`🍎 Usando Safari nativo para canal ${index}`)
+        video.src = url
+        video.play().catch(() => {})
+      }
+    })
 
     return () => {
-      clearTimeout(timer)
       hlsInstances.current.forEach(h => h && h.destroy())
       hlsInstances.current = []
     }
+  //}, [orderedChannels, activeIndex])
   }, [orderedChannels])
 
   // 🔥 AUDIO CONTROL FIX
@@ -110,9 +118,12 @@ const MultiPlayer = ({ channels, onClose }) => {
 
       const isActive = i === activeIndex
       
-      // Solo el activo tiene audio
-      video.muted = !isActive
-      video.volume = isActive ? 1 : 0
+      // FIX: Siempre muteado primero
+      video.muted = true
+      if (isActive) {
+        video.muted = false
+        video.volume = 1
+      }
       
       // Asegurar que todos están reproduciendo
       if (video.paused) {
@@ -143,21 +154,33 @@ const MultiPlayer = ({ channels, onClose }) => {
           cursor: 'pointer'
         }}
       >
-        <video
-          ref={(el) => {
-            if (el) videoRefs.current[index] = el
-          }}
-          autoPlay
-          playsInline
-          muted
-          controls={isMain}
-          preload="auto"
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover'
-          }}
-        />
+        {channel.isEmbed ? (
+          <iframe
+            src={channel.url}
+            allow="autoplay; fullscreen"
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none'
+            }}
+          />
+        ) : (
+          <video
+            ref={(el) => {
+              if (el) videoRefs.current[index] = el
+            }}
+            autoPlay
+            playsInline
+            muted
+            controls={isMain}
+            preload="auto"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover'
+            }}
+          />
+        )}
 
         {isActive && (
           <div style={{

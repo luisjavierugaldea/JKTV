@@ -72,7 +72,8 @@ export default function AgendaView({ onSelectChannel }) {
         name: `${event.titulo} - ${canal.nombre}`,
         url: canal.url,
         logo: event.logo,
-        isEmbed: !isM3U8  // Si es M3U8 → false (usar HLS), si no → true (usar iframe)
+        isEmbed: !isM3U8,
+type: isM3U8 ? 'hls' : 'embed'  // Si es M3U8 → false (usar HLS), si no → true (usar iframe)
       });
       
       setTimeout(() => {
@@ -87,7 +88,8 @@ export default function AgendaView({ onSelectChannel }) {
       name: `${event.titulo} - ${canal.nombre}`,
       url: canal.url,
       logo: event.logo,
-      isEmbed: !isM3U8  // Si es M3U8 → false (usar HLS), si no → true (usar iframe)
+      isEmbed: !isM3U8,
+type: isM3U8 ? 'hls' : 'embed'  // Si es M3U8 → false (usar HLS), si no → true (usar iframe)
     };
 
     const isAlreadySelected = selectedChannels.some(ch => ch.id === channelData.id);

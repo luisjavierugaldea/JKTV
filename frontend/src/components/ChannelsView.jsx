@@ -109,11 +109,15 @@ export default function ChannelsView({ onSelectChannel }) {
 
   const handleSelectChannel = (country, canal) => {
     console.log('[ChannelsView] 📺 Canal seleccionado:', canal.nombre, 'de', country.pais);
+    
+    // Detectar tipo de stream
+    const isM3U8 = canal.url.includes('.m3u8')
+    
     onSelectChannel({
       name: `${canal.nombre} (${country.pais})`,
       url: canal.url,
       logo: country.flag || '📺',
-      isEmbed: true
+      isEmbed: !isM3U8
     });
     
     setTimeout(() => {
